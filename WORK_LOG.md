@@ -279,3 +279,37 @@
 - ยังไม่ได้รัน `prisma migrate deploy`, `prisma migrate status` และ `seed` กับ managed PostgreSQL เพราะ environment นี้ไม่มี connection string จริง; ให้รันตามลำดับใน README โดยไม่ส่ง secret ในแชต
 - ยังไม่ได้รัน `vercel dev` หรือ deploy จริง จึงควร smoke test function routing, CORS, cookie flags, SPA refresh และ business flows หลังสร้าง Vercel projects
 - คำเตือน Vite เรื่อง chunk ใหญ่กว่า 500 kB และ Ant Design `Card bordered` deprecated ยังไม่กระทบ verification gate แต่ควรปรับปรุงภายหลัง
+
+## 31 สิงหาคม 2026 — แก้ Vercel runtime configuration ตาม deployment log
+
+- Deployment จาก GitHub commit `fcb8603` ล้มเหลวก่อนเริ่ม build ด้วยข้อความ `Error: Function Runtimes must have a valid version, for example now-php@1.0.0.`
+- สาเหตุคือ `backend/vercel.json` กำหนด `runtime: nodejs22.x` ซึ่งเป็น Node version ไม่ใช่ชื่อ npm runtime package/version ตามรูปแบบที่ Vercel CLI รุ่นนี้ตรวจสอบ
+- ลบการกำหนด `runtime` ออกจาก `backend/vercel.json`; Node.js เป็น official Vercel runtime จึงให้ Vercel ตรวจจับจาก `api/index.ts` และตั้ง Node.js version จาก Project Settings แทน โดยคง `maxDuration` และ rewrite เดิมไว้
+- ตรวจ JSON config หลังแก้แล้วผ่าน; ต้อง commit/push ไฟล์ `backend/vercel.json` ที่แก้ไปยัง GitHub ก่อนกด redeploy เพราะ commit `fcb8603` ยังเป็น revision เดิมที่มีปัญหา
+
+## 31 สิงหาคม 2026 — ตรวจ URL หลัง deploy จริง
+
+- ตรวจ `https://backend-ten-psi-94.vercel.app/` และ `/api/health` แล้วได้ HTTP 500; backend deployment มีอยู่แต่ application ยังล้มเหลวตอน runtime
+- ตรวจ `https://frontend-rose-one-72.vercel.app/` แล้ว frontend โหลดได้และแสดงหน้า `Equipment Desk`; static deployment เบื้องต้นทำงาน
+- สาเหตุที่ต้องตรวจเป็นลำดับแรกคือ production environment variables ของ Backend โดย `server.ts` จะหยุดตั้งแต่ import หากไม่มี `DATABASE_URL`, `SESSION_SECRET`, `COOKIE_SECURE=true`, `COOKIE_SAME_SITE=none` หรือ `CORS_ORIGIN`
+- หากตั้งค่าครบแล้วแต่ยังได้ 500 ให้ดู Vercel Runtime Logs ต่อ โดยแยกตรวจ Prisma connection (`P1001`/SSL) และ migration ที่ยังไม่ได้ apply (`relation does not exist`); ห้ามบันทึก secret ลง log หรือส่งในแชต
+- สร้างไฟล์ local ที่ถูก ignore สำหรับเตรียม import: `backend/.env` มีตัวแปร Backend ที่จำเป็น และ `frontend/.env` มี `VITE_API_URL` ชี้ไปยัง Backend URL จริง โดยใส่เฉพาะ placeholders ไม่มี secret จริง
+- ต้องแก้ `DATABASE_URL` และ `SESSION_SECRET` ใน `backend/.env` ก่อน import; ห้าม commit ไฟล์ `.env` เหล่านี้กลับไปยัง GitHub
+
+## 31 สิงหาคม 2026 — ตรวจซ้ำหลังผู้ใช้ import Environment Variables
+
+- ตรวจ `https://backend-ten-psi-94.vercel.app/` และ `https://backend-ten-psi-94.vercel.app/api/health` ซ้ำแล้วทั้งคู่ยังตอบ HTTP 500
+- ตรวจ `https://frontend-rose-one-72.vercel.app/` แล้ว frontend ยังโหลดได้และแสดง title `Equipment Desk`
+- สถานะปัจจุบันจึงเป็น frontend พร้อมใช้งานเบื้องต้น แต่ backend ยังไม่เริ่มทำงานสำเร็จ; ต้อง redeploy หลัง import environment และตรวจ Runtime Logs ของ deployment ล่าสุดเพื่อทราบตัวแปรหรือ Prisma error ที่แท้จริง
+
+## 31 สิงหาคม 2026 — แก้ Vercel build ที่ขาด devDependencies
+
+- Vercel deployment จาก commit `0dadda8` ติดตั้งเพียง 111 packages แล้วล้มที่ `TS2688: Cannot find type definition file for 'node'`; สาเหตุคือ `npm ci` ใน production environment ไม่ติดตั้ง `devDependencies` แต่ backend build ต้องใช้ `typescript`, `@types/node` และ Prisma CLI และ frontend build ต้องใช้ Vite/TypeScript
+- เปลี่ยน `installCommand` ใน `backend/vercel.json` และ `frontend/vercel.json` เป็น `npm ci --include=dev` เพื่อให้ build dependencies ถูกติดตั้งแม้ `NODE_ENV=production`
+- อัปเดตคำสั่ง Install ใน `README.md` ให้ตรงกับ Vercel configuration; ต้อง commit/push ไฟล์ config และ README ไปยัง GitHub แล้ว redeploy ใหม่
+
+## 31 สิงหาคม 2026 — ป้องกันไฟล์ `.env` หลุดขึ้น GitHub
+
+- ปรับ `.gitignore` ให้ ignore ทั้ง `.env` และไฟล์รูปแบบ `.env.*` ทุกระดับโฟลเดอร์ พร้อมยกเว้นเฉพาะ `.env.example` ซึ่งไม่มีค่าลับ
+- ไฟล์ `backend/.env` และ `frontend/.env` ที่ใช้เตรียม import เข้า Vercel จะไม่ถูกแสดงเป็นไฟล์สำหรับ commit เมื่อทำงานผ่าน Git
+- หากไฟล์ `.env` เคยถูก commit ไปแล้ว `.gitignore` จะไม่ลบออกจาก Git index อัตโนมัติ ต้องลบออกจาก repository และเปลี่ยน secret ทันที

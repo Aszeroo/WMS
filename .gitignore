@@ -7,7 +7,10 @@ backend/test.db
 backend/test.db-journal
 backend/prisma/*.db
 backend/prisma/*.db-*
+# ห้าม commit ไฟล์ environment จริง ให้เก็บเฉพาะไฟล์ตัวอย่างที่ปลอดภัย
 .env
+.env.*
+!.env.example
 *.log
 *.db
 *.db-*

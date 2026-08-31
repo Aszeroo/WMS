@@ -26,7 +26,7 @@
 - **Root Directory:** `backend`
 - **Framework Preset:** Other
 - **Build Command:** `npm run build`
-- **Install Command:** `npm ci`
+- **Install Command:** `npm ci --include=dev`
 - **Output Directory:** เว้นว่าง (เป็น Node.js Function)
 
 ตั้ง Environment Variables ของ backend (Production และ Preview ตามที่ต้องการ):
@@ -77,7 +77,7 @@ curl https://<ชื่อ-backend-project>.vercel.app/api/health
 - **Root Directory:** `frontend`
 - **Framework Preset:** Other หรือ Vite
 - **Build Command:** `npm run build`
-- **Install Command:** `npm ci`
+- **Install Command:** `npm ci --include=dev`
 - **Output Directory:** `dist`
 
 ตั้ง Environment Variable ของ frontend:
