@@ -1,0 +1,21 @@
+{
+  "name": "equipment-management-system",
+  "version": "1.0.0",
+  "private": true,
+  "allowScripts": {
+    "@prisma/client": true,
+    "@prisma/engines": true,
+    "esbuild": true,
+    "prisma": true
+  },
+  "scripts": {
+    "install:all": "npm_config_allow_scripts= npm install --prefix backend && npm_config_allow_scripts= npm install --prefix frontend",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:frontend": "npm run dev --prefix frontend",
+    "build": "npm run build --prefix backend && npm run build --prefix frontend",
+    "typecheck": "npm run typecheck --prefix backend && npm run typecheck --prefix frontend",
+    "test": "npm test --prefix backend && npm test --prefix frontend",
+    "test:backend": "npm test --prefix backend",
+    "test:frontend": "npm test --prefix frontend"
+  }
+}

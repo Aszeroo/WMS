@@ -1,0 +1,40 @@
+name: ตรวจสอบก่อน deploy
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  verify:
+    name: typecheck, test และ build
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: ดึง source code
+        uses: actions/checkout@v4
+      - name: ตั้งค่า Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            backend/package-lock.json
+            frontend/package-lock.json
+      - name: ติดตั้ง backend dependencies
+        run: npm ci --prefix backend
+      - name: ติดตั้ง frontend dependencies
+        run: npm ci --prefix frontend
+      - name: สร้าง Prisma Client
+        run: npm run generate --prefix backend
+      - name: ตรวจสอบ TypeScript
+        run: npm run typecheck
+      - name: รันทดสอบอัตโนมัติ
+        run: npm test
+      - name: สร้าง production bundles
+        run: npm run build
+      - name: ตรวจสอบ dependency vulnerabilities
+        run: |
+          npm audit --prefix backend --audit-level=high
+          npm audit --prefix frontend --audit-level=high

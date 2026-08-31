@@ -1,0 +1,194 @@
+import bcrypt from 'bcryptjs';
+import request from 'supertest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
+import { app, prisma } from '../src/server';
+
+const password = 'test-password-123';
+let adminCookie = '';
+let staffCookie = '';
+let viewerCookie = '';
+
+const loginCookie = async (identifier: string) => {
+  const result = await request(app).post('/api/auth/login').send({ identifier, password });
+  expect(result.status).toBe(200);
+  const cookies = result.headers['set-cookie'] as string[];
+  return cookies[0];
+};
+
+const setupUsers = async () => {
+  const passwordHash = await bcrypt.hash(password, 10);
+  await prisma.user.createMany({ data: [
+    { username: 'admin', email: 'admin@test.local', passwordHash, role: 'admin' },
+    { username: 'staff', email: 'staff@test.local', passwordHash, role: 'staff' },
+    { username: 'viewer', email: 'viewer@test.local', passwordHash, role: 'viewer' },
+  ] });
+};
+
+describe('production API authentication and state transitions', () => {
+  beforeAll(async () => {
+    await prisma.$connect();
+  });
+
+  beforeEach(async () => {
+    await prisma.equipmentRepair.deleteMany();
+    await prisma.equipmentIssuance.deleteMany();
+    await prisma.equipmentInstance.deleteMany();
+    await prisma.employee.deleteMany();
+    await prisma.equipmentType.deleteMany();
+    await prisma.user.deleteMany();
+    await setupUsers();
+    [adminCookie, staffCookie, viewerCookie] = await Promise.all([
+      loginCookie('admin'), loginCookie('staff'), loginCookie('viewer'),
+    ]);
+  });
+
+  afterAll(async () => {
+    await prisma.$disconnect();
+  });
+
+  it('requires authentication for business reads and writes', async () => {
+    expect((await request(app).get('/api/dashboard/stats')).status).toBe(401);
+    expect((await request(app).post('/api/equipment-types').send({ name: 'Notebook', unit: 'เครื่อง' })).status).toBe(401);
+    expect((await request(app).get('/api/health')).status).toBe(200);
+  });
+
+  it('returns a safe user and revokes bearer tokens on logout', async () => {
+    const me = await request(app).get('/api/auth/me').set('Cookie', adminCookie);
+    expect(me.status).toBe(200);
+    expect(me.body.user).toMatchObject({ username: 'admin', role: 'admin' });
+    expect(me.body.user.passwordHash).toBeUndefined();
+
+    const login = await request(app).post('/api/auth/login').send({ identifier: 'admin', password });
+    expect(login.status).toBe(200);
+    expect(typeof login.body.token).toBe('string');
+    const token = login.body.token as string;
+    const beforeLogout = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
+    expect(beforeLogout.status).toBe(200);
+
+    const logout = await request(app).post('/api/auth/logout').set('Authorization', `Bearer ${token}`);
+    expect(logout.status).toBe(204);
+    const afterLogout = await request(app).get('/api/auth/me').set('Authorization', `Bearer ${token}`);
+    expect(afterLogout.status).toBe(401);
+  });
+
+  it('enforces viewer and staff roles', async () => {
+    const viewerWrite = await request(app).post('/api/equipment-types').set('Cookie', viewerCookie).send({ name: 'Viewer type', unit: 'ชิ้น' });
+    expect(viewerWrite.status).toBe(403);
+    const staffWrite = await request(app).post('/api/equipment-types').set('Cookie', staffCookie).send({ name: 'Staff type', unit: 'ชิ้น' });
+    expect(staffWrite.status).toBe(201);
+    const staffDelete = await request(app).delete(`/api/equipment-types/${staffWrite.body.id}`).set('Cookie', staffCookie);
+    expect(staffDelete.status).toBe(403);
+    const users = await request(app).get('/api/users').set('Cookie', staffCookie);
+    expect(users.status).toBe(403);
+  });
+
+  it('keeps issuance and repair status transitions consistent', async () => {
+    const type = await request(app).post('/api/equipment-types').set('Cookie', staffCookie).send({ name: 'Notebook', unit: 'เครื่อง' });
+    const employee = await request(app).post('/api/employees').set('Cookie', staffCookie).send({ employeeId: 'E-001', name: 'ผู้ทดสอบ' });
+    const equipment = await request(app).post('/api/equipment-instances').set('Cookie', staffCookie).send({ typeId: type.body.id, serialNumber: 'SN-001' });
+    expect(type.status).toBe(201);
+    expect(employee.status).toBe(201);
+    expect(equipment.status).toBe(201);
+
+    const issuance = await request(app).post('/api/issuance-history').set('Cookie', staffCookie).send({ equipmentId: equipment.body.id, employeeId: employee.body.id });
+    expect(issuance.status).toBe(201);
+    let current = await request(app).get('/api/equipment-instances').set('Cookie', staffCookie);
+    expect(current.body.data[0].status).toBe('issued');
+
+    const repairWhileIssued = await request(app).post('/api/repair-history').set('Cookie', staffCookie).send({ equipmentId: equipment.body.id, symptoms: 'จอไม่ติด' });
+    expect(repairWhileIssued.status).toBe(409);
+
+    const returned = await request(app).put(`/api/issuance-history/${issuance.body.id}`).set('Cookie', staffCookie).send({ returnDate: new Date().toISOString() });
+    expect(returned.status).toBe(200);
+    const repair = await request(app).post('/api/repair-history').set('Cookie', staffCookie).send({ equipmentId: equipment.body.id, symptoms: 'จอไม่ติด' });
+    expect(repair.status).toBe(201);
+    current = await request(app).get('/api/equipment-instances').set('Cookie', staffCookie);
+    expect(current.body.data[0].status).toBe('under_repair');
+
+    const completed = await request(app).put(`/api/repair-history/${repair.body.id}`).set('Cookie', staffCookie).send({ status: 'completed' });
+    expect(completed.status).toBe(200);
+    current = await request(app).get('/api/equipment-instances').set('Cookie', staffCookie);
+    expect(current.body.data[0].status).toBe('available');
+  });
+
+  it('filters repair history by equipment and employee', async () => {
+    const type = await request(app).post('/api/equipment-types').set('Cookie', staffCookie).send({ name: 'Filter type', unit: 'เครื่อง' });
+    const [firstEmployee, secondEmployee] = await Promise.all([
+      request(app).post('/api/employees').set('Cookie', staffCookie).send({ employeeId: 'E-FILTER-1', name: 'ผู้รับผิดชอบหนึ่ง' }),
+      request(app).post('/api/employees').set('Cookie', staffCookie).send({ employeeId: 'E-FILTER-2', name: 'ผู้รับผิดชอบสอง' }),
+    ]);
+    const [firstEquipment, secondEquipment] = await Promise.all([
+      request(app).post('/api/equipment-instances').set('Cookie', staffCookie).send({ typeId: type.body.id, serialNumber: 'FILTER-001' }),
+      request(app).post('/api/equipment-instances').set('Cookie', staffCookie).send({ typeId: type.body.id, serialNumber: 'FILTER-002' }),
+    ]);
+    await request(app).post('/api/repair-history').set('Cookie', staffCookie).send({
+      equipmentId: firstEquipment.body.id,
+      employeeId: firstEmployee.body.id,
+      symptoms: 'อาการของเครื่องแรก',
+      status: 'completed',
+    });
+    await request(app).post('/api/repair-history').set('Cookie', staffCookie).send({
+      equipmentId: secondEquipment.body.id,
+      employeeId: secondEmployee.body.id,
+      symptoms: 'อาการของเครื่องที่สอง',
+      status: 'rejected',
+    });
+
+    const byEquipment = await request(app).get('/api/repair-history').set('Cookie', staffCookie).query({ equipmentId: firstEquipment.body.id });
+    expect(byEquipment.status).toBe(200);
+    expect(byEquipment.body).toMatchObject({ total: 1, data: [{ equipmentId: firstEquipment.body.id }] });
+
+    const byEmployee = await request(app).get('/api/repair-history').set('Cookie', staffCookie).query({ employeeId: secondEmployee.body.id });
+    expect(byEmployee.status).toBe(200);
+    expect(byEmployee.body).toMatchObject({ total: 1, data: [{ employeeId: secondEmployee.body.id }] });
+
+    const intersection = await request(app).get('/api/repair-history').set('Cookie', staffCookie).query({
+      equipmentId: firstEquipment.body.id,
+      employeeId: secondEmployee.body.id,
+    });
+    expect(intersection.status).toBe(200);
+    expect(intersection.body).toMatchObject({ total: 0, data: [] });
+  });
+
+  it('paginates equipment instances beyond the first page', async () => {
+    const type = await request(app).post('/api/equipment-types').set('Cookie', staffCookie).send({ name: 'Pagination type', unit: 'เครื่อง' });
+    const serialNumbers = Array.from({ length: 101 }, (_, index) => `PAGE-${String(index + 1).padStart(3, '0')}`);
+    const created = await request(app).post('/api/equipment-instances').set('Cookie', staffCookie).send({
+      typeId: type.body.id,
+      serialNumbers,
+    });
+    expect(created.status).toBe(201);
+    expect(created.body).toHaveLength(101);
+
+    const lastPage = await request(app).get('/api/equipment-instances').set('Cookie', staffCookie).query({ page: 11, pageSize: 10 });
+    expect(lastPage.status).toBe(200);
+    expect(lastPage.body).toMatchObject({ total: 101, page: 11, pageSize: 10, totalPages: 11 });
+    expect(lastPage.body.data).toHaveLength(1);
+    expect(lastPage.body.data[0].serialNumber).toBe('PAGE-101');
+  });
+
+  it('rejects duplicate and malformed data with useful status codes', async () => {
+    const type = await request(app).post('/api/equipment-types').set('Cookie', adminCookie).send({ name: 'Monitor', unit: 'เครื่อง' });
+    const first = await request(app).post('/api/equipment-instances').set('Cookie', adminCookie).send({ typeId: type.body.id, serialNumber: 'DUP-001' });
+    expect(first.status).toBe(201);
+    const duplicate = await request(app).post('/api/equipment-instances').set('Cookie', adminCookie).send({ typeId: type.body.id, serialNumber: 'DUP-001' });
+    expect(duplicate.status).toBe(409);
+    const malformed = await request(app).post('/api/equipment-types').set('Cookie', adminCookie).send({ name: '', unit: 'เครื่อง' });
+    expect(malformed.status).toBe(400);
+
+    const decimalPage = await request(app).get('/api/equipment-instances?page=1.5').set('Cookie', adminCookie);
+    expect(decimalPage.status).toBe(400);
+    const oversizedPage = await request(app).get('/api/equipment-instances?pageSize=101').set('Cookie', adminCookie);
+    expect(oversizedPage.status).toBe(400);
+    const invalidStatus = await request(app).get('/api/equipment-instances?status=unknown').set('Cookie', adminCookie);
+    expect(invalidStatus.status).toBe(400);
+    const invalidDateRange = await request(app).get('/api/repair-history?startDate=2026-02-01&endDate=2026-01-01').set('Cookie', adminCookie);
+    expect(invalidDateRange.status).toBe(400);
+    const invalidRepairStatus = await request(app).get('/api/repair-history?status=unknown').set('Cookie', adminCookie);
+    expect(invalidRepairStatus.status).toBe(400);
+    const invalidRepairEquipment = await request(app).get('/api/repair-history?equipmentId=1.5').set('Cookie', adminCookie);
+    expect(invalidRepairEquipment.status).toBe(400);
+    const invalidRepairEmployee = await request(app).get('/api/repair-history?employeeId=1.5').set('Cookie', adminCookie);
+    expect(invalidRepairEmployee.status).toBe(400);
+  });
+});

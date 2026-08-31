@@ -1,0 +1,65 @@
+x-backend-environment: &backend-environment
+  NODE_ENV: ${NODE_ENV:-development}
+  PORT: 5000
+  DATABASE_URL: ${DATABASE_URL:?กำหนด DATABASE_URL ในไฟล์ .env}
+  CORS_ORIGIN: ${CORS_ORIGIN:?กำหนด CORS_ORIGIN ในไฟล์ .env}
+  SESSION_SECRET: ${SESSION_SECRET:?กำหนด SESSION_SECRET ในไฟล์ .env}
+  COOKIE_SECURE: ${COOKIE_SECURE:?กำหนด COOKIE_SECURE ในไฟล์ .env}
+  COOKIE_SAME_SITE: ${COOKIE_SAME_SITE:-lax}
+  TRUST_PROXY: ${TRUST_PROXY:-true}
+  ADMIN_USERNAME: ${ADMIN_USERNAME:?กำหนด ADMIN_USERNAME ในไฟล์ .env}
+  ADMIN_EMAIL: ${ADMIN_EMAIL:?กำหนด ADMIN_EMAIL ในไฟล์ .env}
+  ADMIN_PASSWORD: ${ADMIN_PASSWORD:?กำหนด ADMIN_PASSWORD ในไฟล์ .env}
+
+services:
+  backend-migrate:
+    build:
+      context: ./backend
+      target: migration
+    environment: *backend-environment
+    command: ["npm", "run", "migrate:deploy"]
+
+  backend-bootstrap:
+    build:
+      context: ./backend
+      target: bootstrap
+    depends_on:
+      backend-migrate:
+        condition: service_completed_successfully
+    environment: *backend-environment
+    command: ["npm", "run", "seed"]
+
+  backend:
+    build:
+      context: ./backend
+      target: production
+    depends_on:
+      backend-bootstrap:
+        condition: service_completed_successfully
+    environment: *backend-environment
+    init: true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: ./frontend
+      args:
+        VITE_API_URL: /api
+    depends_on:
+      backend:
+        condition: service_healthy
+    ports:
+      - "${APP_PORT:-5173}:80"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "--quiet", "http://localhost/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+

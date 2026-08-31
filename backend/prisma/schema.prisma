@@ -1,0 +1,103 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model EquipmentType {
+  id          Int                 @id @default(autoincrement())
+  name        String              @unique
+  unit        String
+  description String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  instances   EquipmentInstance[]
+
+  @@index([name])
+}
+
+model EquipmentInstance {
+  id           Int                 @id @default(autoincrement())
+  serialNumber String              @unique
+  brand        String?
+  model        String?
+  purchaseDate DateTime?
+  status       String              @default("available")
+  typeId       Int
+  type         EquipmentType       @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  issuances    EquipmentIssuance[]
+  repairs      EquipmentRepair[]
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+
+  @@index([status])
+  @@index([typeId])
+  @@index([serialNumber])
+}
+
+model Employee {
+  id         Int                 @id @default(autoincrement())
+  employeeId String              @unique
+  name       String
+  department String?
+  position   String?
+  issuances  EquipmentIssuance[]
+  repairs    EquipmentRepair[]
+  createdAt  DateTime            @default(now())
+  updatedAt  DateTime            @updatedAt
+
+  @@index([name])
+}
+
+model EquipmentIssuance {
+  id          Int               @id @default(autoincrement())
+  equipmentId Int
+  employeeId  Int
+  issueDate   DateTime          @default(now())
+  returnDate  DateTime?
+  building    String?
+  floor       String?
+  jobNumber   String?
+  notes       String?
+  equipment   EquipmentInstance @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
+  employee    Employee          @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+
+  @@index([equipmentId, returnDate])
+  @@index([issueDate])
+  @@index([jobNumber])
+}
+
+model EquipmentRepair {
+  id          Int               @id @default(autoincrement())
+  equipmentId Int
+  employeeId  Int?
+  repairDate  DateTime          @default(now())
+  symptoms    String
+  status      String            @default("reported")
+  repairedBy  String?
+  notes       String?
+  equipment   EquipmentInstance @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
+  employee    Employee?         @relation(fields: [employeeId], references: [id], onDelete: SetNull)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([equipmentId, status])
+  @@index([employeeId])
+  @@index([repairDate])
+}
+
+model User {
+  id             Int      @id @default(autoincrement())
+  username       String   @unique
+  email          String   @unique
+  passwordHash   String
+  role           String   @default("viewer")
+  sessionVersion Int      @default(0)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+}
