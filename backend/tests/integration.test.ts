@@ -47,7 +47,9 @@ describe('production API authentication and state transitions', () => {
   });
 
   it('requires authentication for business reads and writes', async () => {
-    expect((await request(app).get('/api/dashboard/stats')).status).toBe(401);
+    const dashboard = await request(app).get('/api/dashboard/stats');
+    expect(dashboard.status).toBe(401);
+    expect(dashboard.headers['server-timing']).toMatch(/^app;dur=\d+\.\d+$/);
     expect((await request(app).post('/api/equipment-types').send({ name: 'Notebook', unit: 'เครื่อง' })).status).toBe(401);
     expect((await request(app).get('/api/health')).status).toBe(200);
   });
@@ -64,6 +66,7 @@ describe('production API authentication and state transitions', () => {
     const stats = await request(app).get('/api/dashboard/stats').set('Cookie', staffCookie);
 
     expect(stats.status).toBe(200);
+    expect(stats.headers['server-timing']).toMatch(/^app;dur=\d+\.\d+$/);
     expect(stats.body).toEqual({ total: 4, available: 2, issued: 1, underRepair: 1 });
   });
 

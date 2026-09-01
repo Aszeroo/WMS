@@ -2,6 +2,7 @@ import { Alert, Button, Card, Form, Input, Typography } from 'antd';
 import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../auth/AuthContext';
+import { preloadAuthenticatedShell } from '../routes/lazyPages';
 import { getErrorMessage } from '../services/errors';
 
 type LoginValues = { identifier: string; password: string };
@@ -23,6 +24,7 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       await login(values.identifier, values.password);
+      preloadAuthenticatedShell();
       navigate(destination, { replace: true });
     } catch (reason) {
       setError(getErrorMessage(reason, 'ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง'));

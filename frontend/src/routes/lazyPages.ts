@@ -24,3 +24,13 @@ const routeLoaders: Record<string, () => Promise<unknown>> = {
 export const preloadRoute = (path: string): void => {
   void routeLoaders[path]?.();
 };
+
+let authenticatedShellPreload: Promise<unknown[]> | undefined;
+
+export const preloadAuthenticatedShell = (): void => {
+  authenticatedShellPreload ??= Promise.all([pageLoaders.layout(), pageLoaders.dashboard()]).catch((error: unknown) => {
+    authenticatedShellPreload = undefined;
+    throw error;
+  });
+  void authenticatedShellPreload.catch(() => undefined);
+};

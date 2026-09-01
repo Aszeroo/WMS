@@ -8,6 +8,7 @@ import express, {
 } from 'express';
 import rateLimit from 'express-rate-limit';
 import helmet from 'helmet';
+import { performance } from 'node:perf_hooks';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import {
@@ -243,6 +244,18 @@ const userPublicSelect = { id: true, username: true, email: true, role: true } a
 
 app.disable('x-powered-by');
 app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : 0);
+app.use((_, response, next) => {
+  const startedAt = performance.now();
+  const originalEnd = response.end.bind(response);
+  response.end = ((...args: never[]) => {
+    if (!response.headersSent) {
+      const durationMs = (performance.now() - startedAt).toFixed(1);
+      response.setHeader('Server-Timing', `app;dur=${durationMs}`);
+    }
+    return originalEnd(...args);
+  }) as typeof response.end;
+  next();
+});
 app.use(helmet());
 app.use(express.json({ limit: '1mb' }));
 
@@ -406,7 +419,7 @@ app.get('/api/equipment-instances', asyncHandler(async (request, response) => {
     ...(status ? { status } : {}),
     ...(typeId === undefined ? {} : { typeId }),
   };
-  const [data, total] = await prisma.$transaction([
+  const [data, total] = await Promise.all([
     prisma.equipmentInstance.findMany({ where, include: equipmentInclude, orderBy: { createdAt: 'desc' }, skip: (page - 1) * pageSize, take: pageSize }),
     prisma.equipmentInstance.count({ where }),
   ]);
@@ -513,7 +526,7 @@ app.get('/api/issuance-history', asyncHandler(async (request, response) => {
     ...(equipmentId === undefined ? {} : { equipmentId }),
     ...(active === true ? { returnDate: null } : {}),
   };
-  const [data, total] = await prisma.$transaction([
+  const [data, total] = await Promise.all([
     prisma.equipmentIssuance.findMany({ where, include: { equipment: { include: equipmentInclude }, employee: true }, orderBy: { issueDate: 'desc' }, skip: (page - 1) * pageSize, take: pageSize }),
     prisma.equipmentIssuance.count({ where }),
   ]);
@@ -593,7 +606,7 @@ app.get('/api/repair-history', asyncHandler(async (request, response) => {
     ...(equipmentId === undefined ? {} : { equipmentId }),
     ...(employeeId === undefined ? {} : { employeeId }),
   };
-  const [data, total] = await prisma.$transaction([
+  const [data, total] = await Promise.all([
     prisma.equipmentRepair.findMany({ where, include: { equipment: { include: equipmentInclude }, employee: true }, orderBy: { repairDate: 'desc' }, skip: (page - 1) * pageSize, take: pageSize }),
     prisma.equipmentRepair.count({ where }),
   ]);

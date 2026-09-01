@@ -1,6 +1,6 @@
 # WMS2 — บันทึกสถานะงาน
 
-> อัปเดตล่าสุด: 1 กันยายน 2026 — Issuance History, Profile และ User Management ผ่าน quality gates
+> อัปเดตล่าสุด: 1 กันยายน 2026 — ปรับปรุง performance รอบใหม่ผ่าน quality gates
 
 ## กติกาการอัปเดต
 
@@ -427,3 +427,70 @@
 - เพิ่ม regression test เฉพาะ `UserManagementPage`, `AdminRoute` และ visibility ของเมนู หากต้องการ coverage เชิง UI เพิ่มเติม
 - หลังผู้ใช้ commit/push/deploy ให้ทำ browser smoke test ของ issuance, profile, password และ admin user management
 - วัด performance หลัง deploy ตาม Task #8 โดยไม่บันทึก token, password, connection string หรือ secret
+
+## 1 กันยายน 2026 — ตรวจสอบ deployment หลัง deploy
+
+**ผลตรวจสอบจาก production URL**
+
+- `https://backend-ten-psi-94.vercel.app/api/health` ตอบสถานะระบบปกติ และฐานข้อมูลเชื่อมต่อแล้ว
+- `https://backend-ten-psi-94.vercel.app/api/auth/me` ตอบ `401 Unauthorized` เมื่อไม่มี session ตามที่คาดหวัง
+- `https://backend-ten-psi-94.vercel.app/api/users` ตอบ `401 Unauthorized` เมื่อไม่มี session ตามที่คาดหวัง
+- `https://backend-ten-psi-94.vercel.app/api/issuance-history?startDate=&endDate=` ไม่เปิดเผยข้อมูลเมื่อไม่มี session และถูกปฏิเสธที่ authentication boundary; ยังไม่สามารถยืนยันผลรายการจริงโดยไม่มี authenticated session
+- Frontend production ส่งหน้า HTML `Equipment Desk` สำหรับ `/`, `/issuance-history`, `/profile` และ `/user-management` โดยไม่พบข้อมูลบัญชีใน response
+
+**ข้อจำกัด**
+
+- ยังไม่ได้ทำ authenticated browser smoke test เพราะ session/cookie ของผู้ใช้ไม่สามารถเข้าถึงจากการตรวจสอบแบบไม่ส่ง credential ได้
+- ยังไม่ได้ยืนยัน HTTP response หลัง login, การแสดงรายการ issuance, การแก้ Profile และ admin CRUD จาก session จริง
+- ไม่ได้อ่านหรือส่ง password, token, cookie, connection string หรือค่า secret ใด ๆ
+
+## 1 กันยายน 2026 — วัด latency หลัง deploy
+
+**วิธีวัด**
+
+- ใช้ `curl` แบบไม่เก็บ response body และไม่ส่ง credential
+- วัด 10 requests ต่อ endpoint จาก runtime เดียวกัน
+- ค่า `p50` เป็น median ของ 10 ตัวอย่าง และ `p95-observed` คือค่าสูงสุดของ sample ชุดเล็กนี้ ไม่ใช่ percentile จาก production monitoring ระยะยาว
+
+**ผลลัพธ์**
+
+| Endpoint | Status | Average | p50 | p95-observed |
+| --- | ---: | ---: | ---: | ---: |
+| Backend `/api/health` | 200 | 632 ms | 605 ms | 829 ms |
+| Frontend `/` | 200 | 130 ms | 127 ms | 163 ms |
+| Frontend `/issuance-history` | 200 | 133 ms | 131 ms | 172 ms |
+| Backend `/api/auth/me` ไม่มี session | 401 | 377 ms | 370 ms | 452 ms |
+| Backend `/api/issuance-history?startDate=&endDate=` ไม่มี session | 401 | 364 ms | 365 ms | 381 ms |
+
+**สรุปและข้อจำกัด**
+
+- Frontend static/SPA shell ตอบสนองเร็วและทุกเส้นทางที่ตรวจได้ตอบ `200`
+- Backend warm health request อยู่ราว 0.6 วินาที แต่ cold/warm แยกอย่างเป็นระบบยังต้องใช้ APM หรือ browser Network
+- ค่า `/auth/me` และ history ที่วัดเป็น unauthenticated `401` จึงไม่ใช่เวลาของ authenticated workload จริง
+- ยังไม่ได้วัด successful login, authenticated dashboard, issuance history และ repair history เพราะไม่มี authenticated browser session ในเครื่องมือ และไม่ได้อ่านหรือส่ง credential
+- การวัดรอบนี้เป็น snapshot จากจุดตรวจเดียว ไม่ควรใช้แทน p95/p99 ของผู้ใช้จริงในระยะยาว
+
+## 1 กันยายน 2026 — ปรับปรุง performance รอบใหม่
+
+**แก้ไขแล้ว**
+
+- เปลี่ยน read-only `findMany + count` ของ `GET /api/equipment-instances`, `GET /api/issuance-history` และ `GET /api/repair-history` จาก Prisma `$transaction` เป็น `Promise.all` เพื่อลด transaction overhead โดยคง pagination, filters, relations และ response shape เดิม
+- เพิ่ม `Server-Timing: app;dur=...` จาก middleware ที่วัดเฉพาะ application elapsed time ก่อนส่ง response โดยไม่อ่านหรือเปิดเผย body, query values, authorization, cookie หรือข้อมูล credential
+- เพิ่ม `preloadAuthenticatedShell()` ให้โหลด `AppLayout` และ `DashboardPage` พร้อมกันหลัง login สำเร็จ โดยยังคง route-level lazy loading และไม่เพิ่ม initial bundle ของหน้า login
+- เพิ่ม regression test สำหรับ timing header ของ response ปกติ/unauthenticated error และ login transition preload ใน `frontend/src/pages/LoginPage.test.tsx`
+
+**ผลการตรวจสอบ**
+
+- backend `npm run typecheck` — ผ่าน
+- backend `npm test` — ผ่าน 10/10 tests
+- frontend `npm run typecheck` — ผ่าน
+- frontend `npm test -- --run` — ผ่าน 12/12 tests ใน 7 test files; ไม่พบ unhandled error
+- backend และ frontend `npm run build` — ผ่าน
+- `git diff --check` — ผ่าน
+- ยังคงพบเฉพาะคำเตือน Ant Design เดิมเรื่อง `Card bordered` และ `Space direction` และ Prisma package configuration deprecated ซึ่งไม่ทำให้ quality gate ล้มเหลว
+
+**ข้อจำกัดและงานถัดไป**
+
+- ยังไม่ได้ deploy source changes และยังไม่ได้อ้างว่า latency production ลดลงจนกว่าจะวัดหลัง deploy ใหม่ด้วย sample เดิม
+- ต้องตรวจ Vercel cold/warm function duration, region และ Neon/database latency จาก dashboard โดยไม่เปิดเผย connection string; หาก region ไม่สอดคล้องให้เสนอ operational change แยกก่อนปรับ production
+- หลังผู้ใช้เปิด browser session เอง จึงค่อยวัด successful login และ authenticated `/auth/me`, dashboard, issuance และ repair โดยส่งต่อเฉพาะ status/timing ที่ไม่ใช่ credential หรือ token
