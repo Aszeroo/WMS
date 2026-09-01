@@ -54,11 +54,11 @@ describe('ProfilePage', () => {
   it('clears the local session after changing the password', async () => {
     render(<MemoryRouter><ProfilePage /></MemoryRouter>);
     fireEvent.change(screen.getByLabelText('รหัสผ่านปัจจุบัน'), { target: { value: 'old-password' } });
-    fireEvent.change(screen.getByLabelText('รหัสผ่านใหม่'), { target: { value: 'new-password-123' } });
-    fireEvent.change(screen.getByLabelText('ยืนยันรหัสผ่านใหม่'), { target: { value: 'new-password-123' } });
+    fireEvent.change(screen.getByLabelText('รหัสผ่านใหม่'), { target: { value: 'pass1234' } });
+    fireEvent.change(screen.getByLabelText('ยืนยันรหัสผ่านใหม่'), { target: { value: 'pass1234' } });
     fireEvent.submit(screen.getByLabelText('รหัสผ่านปัจจุบัน').closest('form')!);
 
-    await waitFor(() => expect(mockedApi.changePassword).toHaveBeenCalledWith({ currentPassword: 'old-password', newPassword: 'new-password-123' }));
+    await waitFor(() => expect(mockedApi.changePassword).toHaveBeenCalledWith({ currentPassword: 'old-password', newPassword: 'pass1234' }));
     await waitFor(() => expect(clearUser).toHaveBeenCalled());
     await waitFor(() => expect(mockedNavigate).toHaveBeenCalledWith('/login', { replace: true }));
   });

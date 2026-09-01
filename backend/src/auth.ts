@@ -4,6 +4,7 @@ import type { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 
 export const ROLES = ['admin', 'staff', 'viewer'] as const;
+export const MIN_PASSWORD_LENGTH = 8;
 export type Role = (typeof ROLES)[number];
 
 export interface PublicUser {

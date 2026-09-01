@@ -46,13 +46,13 @@ describe('UserManagementPage', () => {
     fireEvent.click(screen.getByRole('button', { name: '+ เพิ่มผู้ใช้งาน' }));
     fireEvent.change(screen.getByLabelText('ชื่อผู้ใช้งาน'), { target: { value: 'new-staff' } });
     fireEvent.change(screen.getByLabelText('อีเมล'), { target: { value: 'new-staff@test.local' } });
-    fireEvent.change(screen.getByLabelText('รหัสผ่าน'), { target: { value: 'new-password-123' } });
+    fireEvent.change(screen.getByLabelText('รหัสผ่าน'), { target: { value: 'pass1234' } });
     fireEvent.submit(screen.getByLabelText('ชื่อผู้ใช้งาน').closest('form')!);
 
     await waitFor(() => expect(mockedApi.createUser).toHaveBeenCalledWith({
       username: 'new-staff',
       email: 'new-staff@test.local',
-      password: 'new-password-123',
+      password: 'pass1234',
       role: 'viewer',
     }));
     expect(mockedApi.createUser.mock.calls[0][0]).not.toHaveProperty('passwordHash');

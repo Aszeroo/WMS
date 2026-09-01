@@ -1,6 +1,6 @@
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
-import { hashPassword } from '../src/auth';
+import { hashPassword, MIN_PASSWORD_LENGTH } from '../src/auth';
 
 const prisma = new PrismaClient();
 
@@ -14,7 +14,7 @@ const main = async (): Promise<void> => {
   const username = requiredEnvironment('ADMIN_USERNAME');
   const email = requiredEnvironment('ADMIN_EMAIL').toLowerCase();
   const password = requiredEnvironment('ADMIN_PASSWORD');
-  if (password.length < 12) throw new Error('ADMIN_PASSWORD must contain at least 12 characters');
+  if (password.length < MIN_PASSWORD_LENGTH) throw new Error(`ADMIN_PASSWORD must contain at least ${MIN_PASSWORD_LENGTH} characters`);
 
   const [byUsername, byEmail] = await Promise.all([
     prisma.user.findUnique({ where: { username } }),

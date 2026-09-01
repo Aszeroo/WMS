@@ -100,21 +100,21 @@ describe('production API authentication and state transitions', () => {
 
     const wrongPassword = await request(app).post('/api/auth/change-password').set('Cookie', adminCookie).send({
       currentPassword: 'wrong-password',
-      newPassword: 'new-test-password-123',
+      newPassword: 'newpass8',
     });
     expect(wrongPassword.status).toBe(400);
     expect(wrongPassword.body.code).toBe('INVALID_CURRENT_PASSWORD');
 
     const changed = await request(app).post('/api/auth/change-password').set('Cookie', adminCookie).send({
       currentPassword: password,
-      newPassword: 'new-test-password-123',
+      newPassword: 'newpass8',
     });
     expect(changed.status).toBe(204);
     expect(changed.body).toEqual({});
 
     const oldSession = await request(app).get('/api/auth/me').set('Cookie', adminCookie);
     expect(oldSession.status).toBe(401);
-    const newLogin = await request(app).post('/api/auth/login').send({ identifier: 'admin-renamed', password: 'new-test-password-123' });
+    const newLogin = await request(app).post('/api/auth/login').send({ identifier: 'admin-renamed', password: 'newpass8' });
     expect(newLogin.status).toBe(200);
     expect(newLogin.body.user.passwordHash).toBeUndefined();
     expect(typeof newLogin.body.token).toBe('string');
@@ -135,10 +135,18 @@ describe('production API authentication and state transitions', () => {
     const created = await request(app).post('/api/users').set('Cookie', adminCookie).send({
       username: 'managed-user',
       email: 'managed-user@test.local',
-      password,
+      password: 'eight888',
       role: 'viewer',
     });
     expect(created.status).toBe(201);
+
+    const tooShort = await request(app).post('/api/users').set('Cookie', adminCookie).send({
+      username: 'too-short-password',
+      email: 'too-short-password@test.local',
+      password: 'seven77',
+      role: 'viewer',
+    });
+    expect(tooShort.status).toBe(400);
     expect(created.body).toMatchObject({ username: 'managed-user', role: 'viewer' });
     expect(created.body.passwordHash).toBeUndefined();
 
@@ -146,7 +154,7 @@ describe('production API authentication and state transitions', () => {
     expect(listed.status).toBe(200);
     expect(listed.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.body.id, username: 'managed-user' })]));
 
-    const updated = await request(app).put(`/api/users/${created.body.id}`).set('Cookie', adminCookie).send({ role: 'staff' });
+    const updated = await request(app).put(`/api/users/${created.body.id}`).set('Cookie', adminCookie).send({ role: 'staff', password: 'newpass8' });
     expect(updated.status).toBe(200);
     expect(updated.body).toMatchObject({ id: created.body.id, role: 'staff' });
     expect(updated.body.passwordHash).toBeUndefined();

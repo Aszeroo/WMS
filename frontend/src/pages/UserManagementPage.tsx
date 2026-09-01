@@ -154,7 +154,7 @@ export function UserManagementPage() {
           <Form.Item name="role" label="สิทธิ์การใช้งาน" rules={[{ required: true, message: 'กรุณาเลือกสิทธิ์การใช้งาน' }]}>
             <Select options={roleOptions} />
           </Form.Item>
-          <Form.Item name="password" label={editing ? 'รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)' : 'รหัสผ่าน'} rules={[{ required: !editing, message: 'กรุณาระบุรหัสผ่าน' }, { min: 12, message: 'รหัสผ่านต้องมีอย่างน้อย 12 ตัวอักษร' }]}>
+          <Form.Item name="password" label={editing ? 'รหัสผ่านใหม่ (เว้นว่างหากไม่เปลี่ยน)' : 'รหัสผ่าน'} rules={[{ required: !editing, message: 'กรุณาระบุรหัสผ่าน' }, { min: 8, message: 'รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร' }]}>
             <Input.Password autoComplete={editing ? 'new-password' : 'new-password'} />
           </Form.Item>
           <div className="modal-actions"><Button onClick={() => setModalOpen(false)}>ยกเลิก</Button><Button type="primary" htmlType="submit">บันทึก</Button></div>

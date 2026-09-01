@@ -12,6 +12,7 @@ import { performance } from 'node:perf_hooks';
 import { Prisma, PrismaClient } from '@prisma/client';
 import { z } from 'zod';
 import {
+  MIN_PASSWORD_LENGTH,
   ROLES,
   claimsFromRequest,
   clearSessionCookie,
@@ -220,13 +221,13 @@ const loginSchema = z.object({
 const userCreateSchema = z.object({
   username: z.string().trim().min(3).max(100),
   email: z.string().trim().email().max(254),
-  password: z.string().min(12).max(200),
+  password: z.string().min(MIN_PASSWORD_LENGTH).max(200),
   role: z.enum(ROLES).default('viewer'),
 });
 const userUpdateSchema = z.object({
   username: z.string().trim().min(3).max(100).optional(),
   email: z.string().trim().email().max(254).optional(),
-  password: z.string().min(12).max(200).optional(),
+  password: z.string().min(MIN_PASSWORD_LENGTH).max(200).optional(),
   role: z.enum(ROLES).optional(),
 }).refine((value) => Object.keys(value).length > 0, { message: 'At least one field is required' });
 const profileUpdateSchema = z.object({
@@ -235,7 +236,7 @@ const profileUpdateSchema = z.object({
 }).refine((value) => Object.keys(value).length > 0, { message: 'At least one field is required' });
 const changePasswordSchema = z.object({
   currentPassword: z.string().min(1).max(200),
-  newPassword: z.string().min(12).max(200),
+  newPassword: z.string().min(MIN_PASSWORD_LENGTH).max(200),
 }).refine((value) => value.currentPassword !== value.newPassword, {
   message: 'New password must be different from current password',
   path: ['newPassword'],

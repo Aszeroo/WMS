@@ -325,7 +325,7 @@
 
 - ผู้ใช้ยังไม่มีบัญชี `admin`; การรัน `npm ci` และ `npm run generate` สำเร็จแล้ว โดย Prisma Client `6.19.0` ถูก generate จาก `.env` เรียบร้อย
 - Warning ที่พบระหว่าง generate เรื่อง `package.json#prisma` deprecated ใน Prisma 7 ยังไม่ใช่ failure และยังไม่ต้องแก้เพื่อทำงานต่อ
-- ผู้ใช้ต้องเพิ่มค่าเหล่านี้ใน `backend/.env` (ไฟล์นี้ห้าม commit): `ADMIN_USERNAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` โดย password ต้องยาวอย่างน้อย 12 ตัวอักษร
+- ผู้ใช้ต้องเพิ่มค่าเหล่านี้ใน `backend/.env` (ไฟล์นี้ห้าม commit): `ADMIN_USERNAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` โดย password ต้องยาวอย่างน้อย 8 ตัวอักษร
 - หลังเปิดเครื่อง ให้เข้าโฟลเดอร์ `backend` แล้วตรวจ migration ก่อน:
   ```bash
   cd /home/wasu/claude_code/wms2/backend
@@ -494,3 +494,10 @@
 - ยังไม่ได้ deploy source changes และยังไม่ได้อ้างว่า latency production ลดลงจนกว่าจะวัดหลัง deploy ใหม่ด้วย sample เดิม
 - ต้องตรวจ Vercel cold/warm function duration, region และ Neon/database latency จาก dashboard โดยไม่เปิดเผย connection string; หาก region ไม่สอดคล้องให้เสนอ operational change แยกก่อนปรับ production
 - หลังผู้ใช้เปิด browser session เอง จึงค่อยวัด successful login และ authenticated `/auth/me`, dashboard, issuance และ repair โดยส่งต่อเฉพาะ status/timing ที่ไม่ใช่ credential หรือ token
+
+## 1 กันยายน 2026 — ปรับนโยบายความยาวรหัสผ่าน
+
+- ปรับความยาวรหัสผ่านขั้นต่ำจาก 12 เป็น 8 ตัวอักษรสำหรับการสร้างผู้ใช้, การแก้ไขรหัสผ่านโดย admin, การเปลี่ยนรหัสผ่านของตนเอง และ `ADMIN_PASSWORD` ใน seed
+- เพิ่ม `MIN_PASSWORD_LENGTH` ใน `backend/src/auth.ts` เพื่อให้ backend schema และ seed ใช้ค่ากลางเดียวกัน
+- อัปเดต validation message ของ Profile/User Management รวมถึง `README.md` และ `backend/.env.example`
+- คง bcrypt work factor 12, การตรวจรหัสผ่านเดิม และ `sessionVersion` session revocation ไว้เหมือนเดิม

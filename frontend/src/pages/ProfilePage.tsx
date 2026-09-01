@@ -88,7 +88,7 @@ export function ProfilePage() {
           <Form.Item name="currentPassword" label="รหัสผ่านปัจจุบัน" rules={[{ required: true, message: 'กรุณาระบุรหัสผ่านปัจจุบัน' }]}>
             <Input.Password autoComplete="current-password" />
           </Form.Item>
-          <Form.Item name="newPassword" label="รหัสผ่านใหม่" rules={[{ required: true, message: 'กรุณาระบุรหัสผ่านใหม่' }, { min: 12, message: 'รหัสผ่านใหม่ต้องมีอย่างน้อย 12 ตัวอักษร' }]}>
+          <Form.Item name="newPassword" label="รหัสผ่านใหม่" rules={[{ required: true, message: 'กรุณาระบุรหัสผ่านใหม่' }, { min: 8, message: 'รหัสผ่านใหม่ต้องมีอย่างน้อย 8 ตัวอักษร' }]}>
             <Input.Password autoComplete="new-password" />
           </Form.Item>
           <Form.Item

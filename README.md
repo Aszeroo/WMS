@@ -58,7 +58,7 @@ DATABASE_URL="<PostgreSQL connection string>" npm run migrate:deploy
 DATABASE_URL="<PostgreSQL connection string>" \
 ADMIN_USERNAME="admin" \
 ADMIN_EMAIL="admin@example.com" \
-ADMIN_PASSWORD="<รหัสผ่านอย่างน้อย 12 ตัวอักษร>" \
+ADMIN_PASSWORD="<รหัสผ่านอย่างน้อย 8 ตัวอักษร>" \
 npm run seed
 ```
 
