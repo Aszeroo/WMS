@@ -1,6 +1,7 @@
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
+import { AdminRoute } from './auth/AdminRoute';
 import { ProtectedRoute } from './auth/ProtectedRoute';
 import { pageLoaders } from './routes/lazyPages';
 
@@ -11,6 +12,8 @@ const EquipmentManagementPage = lazy(pageLoaders.equipment);
 const IssuanceHistoryPage = lazy(pageLoaders.issuance);
 const RepairHistoryPage = lazy(pageLoaders.repair);
 const EmployeeManagementPage = lazy(pageLoaders.employees);
+const ProfilePage = lazy(pageLoaders.profile);
+const UserManagementPage = lazy(pageLoaders.userManagement);
 
 function NotFoundPage() {
   return <div className="not-found"><h1>ไม่พบหน้านี้</h1><p>กรุณาเลือกเมนูจากแถบด้านข้าง</p></div>;
@@ -35,6 +38,11 @@ export default function App() {
                 <Route path="/employees" element={<EmployeeManagementPage />} />
                 <Route path="/issuance-history" element={<IssuanceHistoryPage />} />
                 <Route path="/repair-history" element={<RepairHistoryPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route element={<AdminRoute />}>
+                  <Route path="/user-management" element={<UserManagementPage />} />
+                  <Route path="/users" element={<UserManagementPage />} />
+                </Route>
                 <Route path="*" element={<NotFoundPage />} />
               </Route>
             </Route>

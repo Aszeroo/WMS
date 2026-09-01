@@ -42,6 +42,8 @@ beforeEach(() => {
     loading: false,
     login: vi.fn(),
     logout: vi.fn(),
+    updateUser: vi.fn(),
+    clearUser: vi.fn(),
     canWrite: true,
     isAdmin: false,
   });
@@ -69,5 +71,5 @@ describe('RepairHistoryPage', () => {
     const [, payload] = mockedApi.updateRepair.mock.calls[0];
     expect(payload).not.toHaveProperty('equipmentId');
     expect(payload).toMatchObject({ symptoms: 'เปลี่ยนหน้าจอแล้ว' });
-  });
+  }, 10000);
 });

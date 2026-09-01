@@ -1,6 +1,6 @@
 # WMS2 — บันทึกสถานะงาน
 
-> อัปเดตล่าสุด: 1 กันยายน 2026 — กำลังตรวจสอบผล performance
+> อัปเดตล่าสุด: 1 กันยายน 2026 — Issuance History, Profile และ User Management ผ่าน quality gates
 
 ## กติกาการอัปเดต
 
@@ -400,3 +400,30 @@
 - วัด `TTFB`, server processing และ download ของ login, `/auth/me`, dashboard และ endpoint หลักจาก browser Network ทั้ง cold/warm request
 - ตรวจ region ของ Vercel กับ Neon และพิจารณา `manualChunks` เฉพาะเมื่อ metrics ยืนยันว่าเป็นคอขวด
 - ทำ browser smoke test หลัง deploy และบันทึกค่า p50/p95 โดยไม่บันทึก token, password, connection string หรือ secret
+
+## 1 กันยายน 2026 — Issuance History, Profile และ User Management
+
+**แก้ไขแล้ว**
+
+- แก้ `dateFilter` ใน `backend/src/server.ts` ให้ `startDate`/`endDate` ที่เป็นค่าว่างหมายถึงไม่มีตัวกรอง ขณะที่ยัง reject วันที่ไม่ถูกต้องและช่วงวันที่กลับด้าน
+- ปรับ `IssuanceHistoryPage` ไม่ส่ง optional query ที่เป็น empty string เพื่อป้องกัน `Invalid start date` ตั้งแต่ฝั่ง client และคง backward compatibility ฝั่ง API
+- เพิ่ม `PUT /api/auth/profile` สำหรับแก้ username/email ของผู้ใช้ที่ authenticated โดยใช้ user id จาก session และคืนเฉพาะ `PublicUser`
+- เพิ่ม `POST /api/auth/change-password` ตรวจรหัสผ่านเดิม, ใช้ bcrypt work factor 12, เพิ่ม `sessionVersion`, ล้าง session cookie และไม่คืนข้อมูลลับ
+- เสริม admin user CRUD ให้ invalidate session เมื่อเปลี่ยน password/role และป้องกันการลบหรือ downgrade admin คนสุดท้ายด้วย transaction ระดับ `Serializable`; คงการห้ามลบบัญชีตนเอง
+- เพิ่ม frontend API/types/auth state สำหรับ profile, password และ user CRUD
+- เพิ่มหน้า Profile สำหรับทุก role และหน้า User Management พร้อม admin route guard, lazy routes และเมนูตาม role
+- เพิ่ม frontend regression test สำหรับ Profile และปรับ test setup/mocks ให้จัดการ async state ได้ถูกต้อง
+
+**ผลการตรวจสอบ**
+
+- `npm run typecheck` จาก root — ผ่าน
+- `npm test` จาก root — ผ่าน: backend 10/10 tests และ frontend 11/11 tests (6 test files)
+- `npm run build` จาก root — ผ่านทั้ง backend และ frontend
+- พบเพียงคำเตือนเดิมของ Ant Design (`Card bordered`/`Space direction` deprecated) และไม่มี test unhandled error; ยังไม่แก้ warning ที่อยู่นอก scope
+- ยังไม่มีการ commit หรือ deploy source changes โดยอัตโนมัติ
+
+**งานค้างถัดไป**
+
+- เพิ่ม regression test เฉพาะ `UserManagementPage`, `AdminRoute` และ visibility ของเมนู หากต้องการ coverage เชิง UI เพิ่มเติม
+- หลังผู้ใช้ commit/push/deploy ให้ทำ browser smoke test ของ issuance, profile, password และ admin user management
+- วัด performance หลัง deploy ตาม Task #8 โดยไม่บันทึก token, password, connection string หรือ secret

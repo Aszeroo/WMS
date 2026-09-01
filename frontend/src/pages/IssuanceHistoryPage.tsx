@@ -64,7 +64,15 @@ export function IssuanceHistoryPage() {
   const loadHistory = useCallback(async () => {
     setLoading(true);
     try {
-      const next = await apiService.getIssuances({ ...filters, page: result.page, pageSize: result.pageSize });
+      const next = await apiService.getIssuances({
+        ...(filters.startDate ? { startDate: filters.startDate } : {}),
+        ...(filters.endDate ? { endDate: filters.endDate } : {}),
+        ...(filters.building ? { building: filters.building } : {}),
+        ...(filters.floor ? { floor: filters.floor } : {}),
+        ...(filters.jobNumber ? { jobNumber: filters.jobNumber } : {}),
+        page: result.page,
+        pageSize: result.pageSize,
+      });
       setResult(next);
     } catch (reason) {
       setError(getErrorMessage(reason, 'ไม่สามารถโหลดประวัติการเบิกได้'));

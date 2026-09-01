@@ -145,19 +145,21 @@ const optionalBooleanQuery = (value: unknown, field: string): boolean | undefine
 
 const dateFilter = (from: unknown, to: unknown) => {
   const value: { gte?: Date; lte?: Date } = {};
-  if (from !== undefined && (typeof from !== 'string' || !from)) {
+  const startDate = from === '' ? undefined : from;
+  const endDate = to === '' ? undefined : to;
+  if (startDate !== undefined && typeof startDate !== 'string') {
     throw new HttpError(400, 'Invalid start date', 'VALIDATION_ERROR');
   }
-  if (to !== undefined && (typeof to !== 'string' || !to)) {
+  if (endDate !== undefined && typeof endDate !== 'string') {
     throw new HttpError(400, 'Invalid end date', 'VALIDATION_ERROR');
   }
-  if (typeof from === 'string' && from) {
-    const date = new Date(from);
+  if (typeof startDate === 'string') {
+    const date = new Date(startDate);
     if (Number.isNaN(date.getTime())) throw new HttpError(400, 'Invalid start date', 'VALIDATION_ERROR');
     value.gte = date;
   }
-  if (typeof to === 'string' && to) {
-    const date = new Date(to);
+  if (typeof endDate === 'string') {
+    const date = new Date(endDate);
     if (Number.isNaN(date.getTime())) throw new HttpError(400, 'Invalid end date', 'VALIDATION_ERROR');
     date.setHours(23, 59, 59, 999);
     value.lte = date;
@@ -226,6 +228,18 @@ const userUpdateSchema = z.object({
   password: z.string().min(12).max(200).optional(),
   role: z.enum(ROLES).optional(),
 }).refine((value) => Object.keys(value).length > 0, { message: 'At least one field is required' });
+const profileUpdateSchema = z.object({
+  username: z.string().trim().min(3).max(100).optional(),
+  email: z.string().trim().email().max(254).optional(),
+}).refine((value) => Object.keys(value).length > 0, { message: 'At least one field is required' });
+const changePasswordSchema = z.object({
+  currentPassword: z.string().min(1).max(200),
+  newPassword: z.string().min(12).max(200),
+}).refine((value) => value.currentPassword !== value.newPassword, {
+  message: 'New password must be different from current password',
+  path: ['newPassword'],
+});
+const userPublicSelect = { id: true, username: true, email: true, role: true } as const;
 
 app.disable('x-powered-by');
 app.set('trust proxy', process.env.TRUST_PROXY === 'true' ? 1 : 0);
@@ -300,6 +314,36 @@ app.post('/api/auth/logout', asyncHandler(async (request, response) => {
 app.get('/api/auth/me', requireAuth(prisma), (_request, response) => {
   response.json({ user: _request.auth });
 });
+
+app.put('/api/auth/profile', requireAuth(prisma), asyncHandler(async (request, response) => {
+  const values = parseZod(profileUpdateSchema, request.body);
+  const userId = request.auth?.id;
+  if (!userId) throw new HttpError(401, 'Authentication required', 'AUTH_REQUIRED');
+  const user = await prisma.user.update({
+    where: { id: userId },
+    data: { username: values.username, email: values.email },
+    select: userPublicSelect,
+  });
+  const safeUser = publicUser(user);
+  if (!safeUser) throw new HttpError(500, 'Could not update profile');
+  response.json(safeUser);
+}));
+
+app.post('/api/auth/change-password', requireAuth(prisma), asyncHandler(async (request, response) => {
+  const values = parseZod(changePasswordSchema, request.body);
+  const userId = request.auth?.id;
+  if (!userId) throw new HttpError(401, 'Authentication required', 'AUTH_REQUIRED');
+  const user = await prisma.user.findUnique({ where: { id: userId }, select: { passwordHash: true } });
+  if (!user || !(await verifyPassword(values.currentPassword, user.passwordHash))) {
+    throw new HttpError(400, 'Current password is incorrect', 'INVALID_CURRENT_PASSWORD');
+  }
+  await prisma.user.update({
+    where: { id: userId },
+    data: { passwordHash: await hashPassword(values.newPassword), sessionVersion: { increment: 1 } },
+  });
+  clearSessionCookie(response);
+  response.status(204).send();
+}));
 
 // เส้นทางธุรกิจทั้งหมดต้องยืนยันตัวตน ส่วน health และ auth อยู่ด้านบนแล้ว
 app.use('/api', (request, response, next) => {
@@ -628,7 +672,6 @@ app.delete('/api/repair-history/:id', adminAccess, asyncHandler(async (request, 
   response.status(204).send();
 }));
 
-const userPublicSelect = { id: true, username: true, email: true, role: true } as const;
 app.get('/api/users', adminAccess, asyncHandler(async (_request, response) => {
   const users = await prisma.user.findMany({ select: userPublicSelect, orderBy: { username: 'asc' } });
   response.json(users.map((user) => publicUser(user)).filter((user): user is NonNullable<typeof user> => Boolean(user)));
@@ -647,13 +690,25 @@ app.post('/api/users', adminAccess, asyncHandler(async (request, response) => {
 app.put('/api/users/:id', adminAccess, asyncHandler(async (request, response) => {
   const values = parseZod(userUpdateSchema, request.body);
   const id = idFrom(request);
-  const data: Prisma.UserUpdateInput = { username: values.username, email: values.email, role: values.role };
-  if (values.password) {
-    data.passwordHash = await hashPassword(values.password);
-    data.sessionVersion = { increment: 1 };
-  }
-  const user = await prisma.user.update({ where: { id }, data, select: userPublicSelect });
-  const safeUser = publicUser(user);
+  const passwordHash = values.password ? await hashPassword(values.password) : undefined;
+  const safeUser = await prisma.$transaction(async (transaction) => {
+    const existing = await transaction.user.findUnique({ where: { id }, select: { role: true } });
+    if (!existing) throw new HttpError(404, 'User not found', 'NOT_FOUND');
+    const roleChanged = values.role !== undefined && values.role !== existing.role;
+    if (roleChanged && existing.role === 'admin' && values.role !== 'admin') {
+      const adminCount = await transaction.user.count({ where: { role: 'admin' } });
+      if (adminCount <= 1) throw new HttpError(409, 'At least one administrator must remain', 'LAST_ADMIN_REQUIRED');
+    }
+    const data: Prisma.UserUpdateInput = {
+      username: values.username,
+      email: values.email,
+      role: values.role,
+      ...(passwordHash ? { passwordHash } : {}),
+      ...(passwordHash || roleChanged ? { sessionVersion: { increment: 1 } } : {}),
+    };
+    const user = await transaction.user.update({ where: { id }, data, select: userPublicSelect });
+    return publicUser(user);
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   if (!safeUser) throw new HttpError(500, 'Could not update user');
   response.json(safeUser);
 }));
@@ -661,7 +716,15 @@ app.put('/api/users/:id', adminAccess, asyncHandler(async (request, response) =>
 app.delete('/api/users/:id', adminAccess, asyncHandler(async (request, response) => {
   const id = idFrom(request);
   if (request.auth?.id === id) throw new HttpError(400, 'You cannot delete your own account', 'VALIDATION_ERROR');
-  await prisma.user.delete({ where: { id } });
+  await prisma.$transaction(async (transaction) => {
+    const existing = await transaction.user.findUnique({ where: { id }, select: { role: true } });
+    if (!existing) throw new HttpError(404, 'User not found', 'NOT_FOUND');
+    if (existing.role === 'admin') {
+      const adminCount = await transaction.user.count({ where: { role: 'admin' } });
+      if (adminCount <= 1) throw new HttpError(409, 'At least one administrator must remain', 'LAST_ADMIN_REQUIRED');
+    }
+    await transaction.user.delete({ where: { id } });
+  }, { isolationLevel: Prisma.TransactionIsolationLevel.Serializable });
   response.status(204).send();
 }));
 

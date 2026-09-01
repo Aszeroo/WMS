@@ -1,17 +1,21 @@
 import axios from 'axios';
 import { getCached, invalidateCache } from './cache';
 import type {
+  ChangePasswordInput,
   DashboardStats,
   Employee,
   EquipmentInstance,
   EquipmentType,
   Issuance,
   PageResult,
+  ProfileUpdateInput,
   Repair,
   RepairCreateInput,
   RepairHistoryQuery,
   RepairUpdateInput,
   User,
+  UserCreateInput,
+  UserUpdateInput,
 } from '../types';
 
 const api = axios.create({
@@ -26,6 +30,10 @@ export const apiService = {
     api.post<{ user: User }>('/auth/login', payload).then((response) => response.data),
   logout: () => api.post('/auth/logout').then((response) => response.data),
   me: () => api.get<{ user: User }>('/auth/me').then((response) => response.data.user),
+  updateProfile: (payload: ProfileUpdateInput) =>
+    api.put<User>('/auth/profile', payload).then((response) => response.data),
+  changePassword: (payload: ChangePasswordInput) =>
+    api.post('/auth/change-password', payload).then(() => undefined),
 
   getStats: () => api.get<DashboardStats>('/dashboard/stats').then((response) => response.data),
 
@@ -77,6 +85,13 @@ export const apiService = {
     invalidateCache('employees');
     return response;
   }),
+
+  getUsers: () => api.get<User[]>('/users').then((response) => response.data),
+  createUser: (payload: UserCreateInput) =>
+    api.post<User>('/users', payload).then((response) => response.data),
+  updateUser: (id: number, payload: UserUpdateInput) =>
+    api.put<User>(`/users/${id}`, payload).then((response) => response.data),
+  deleteUser: (id: number) => api.delete(`/users/${id}`),
 
   getIssuances: (params?: Record<string, string | number | boolean | undefined>) =>
     api.get<PageResult<Issuance>>('/issuance-history', { params }).then((response) => response.data),

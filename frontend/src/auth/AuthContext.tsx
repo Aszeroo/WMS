@@ -7,6 +7,8 @@ interface AuthContextValue {
   loading: boolean;
   login: (identifier: string, password: string) => Promise<User>;
   logout: () => Promise<void>;
+  updateUser: (nextUser: User) => void;
+  clearUser: () => void;
   canWrite: boolean;
   isAdmin: boolean;
 }
@@ -43,14 +45,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   }, []);
 
+  const updateUser = useCallback((nextUser: User) => setUser(nextUser), []);
+  const clearUser = useCallback(() => setUser(null), []);
+
   const value = useMemo<AuthContextValue>(() => ({
     user,
     loading,
     login,
     logout,
+    updateUser,
+    clearUser,
     canWrite: user?.role === 'admin' || user?.role === 'staff',
     isAdmin: user?.role === 'admin',
-  }), [user, loading, login, logout]);
+  }), [user, loading, login, logout, updateUser, clearUser]);
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

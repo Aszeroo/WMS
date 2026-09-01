@@ -7,6 +7,30 @@ export interface User {
   role: UserRole;
 }
 
+export interface ProfileUpdateInput {
+  username?: string;
+  email?: string;
+}
+
+export interface ChangePasswordInput {
+  currentPassword: string;
+  newPassword: string;
+}
+
+export interface UserCreateInput {
+  username: string;
+  email: string;
+  password: string;
+  role: UserRole;
+}
+
+export interface UserUpdateInput {
+  username?: string;
+  email?: string;
+  password?: string;
+  role?: UserRole;
+}
+
 export type EquipmentStatus = 'available' | 'issued' | 'under_repair' | string;
 export type RepairStatus = 'reported' | 'in_progress' | 'completed' | 'rejected' | string;
 

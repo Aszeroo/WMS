@@ -23,13 +23,13 @@ describe('ProtectedRoute', () => {
   beforeEach(() => vi.clearAllMocks());
 
   it('redirects users who are not signed in', () => {
-    mockedUseAuth.mockReturnValue({ user: null, loading: false, login: vi.fn(), logout: vi.fn(), canWrite: false, isAdmin: false });
+    mockedUseAuth.mockReturnValue({ user: null, loading: false, login: vi.fn(), logout: vi.fn(), updateUser: vi.fn(), clearUser: vi.fn(), canWrite: false, isAdmin: false });
     renderRoutes();
     expect(screen.getByText('หน้าเข้าสู่ระบบ')).toBeInTheDocument();
   });
 
   it('renders the protected page after authentication', () => {
-    mockedUseAuth.mockReturnValue({ user: { id: 1, username: 'staff', email: 'staff@test.local', role: 'staff' }, loading: false, login: vi.fn(), logout: vi.fn(), canWrite: true, isAdmin: false });
+    mockedUseAuth.mockReturnValue({ user: { id: 1, username: 'staff', email: 'staff@test.local', role: 'staff' }, loading: false, login: vi.fn(), logout: vi.fn(), updateUser: vi.fn(), clearUser: vi.fn(), canWrite: true, isAdmin: false });
     renderRoutes();
     expect(screen.getByText('ข้อมูลที่ป้องกันไว้')).toBeInTheDocument();
   });

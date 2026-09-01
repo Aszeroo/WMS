@@ -86,6 +86,37 @@ describe('production API authentication and state transitions', () => {
     expect(afterLogout.status).toBe(401);
   });
 
+  it('updates a safe profile and invalidates sessions after password change', async () => {
+    const profile = await request(app).put('/api/auth/profile').set('Cookie', adminCookie).send({
+      username: 'admin-renamed',
+      email: 'admin-renamed@test.local',
+    });
+    expect(profile.status).toBe(200);
+    expect(profile.body).toEqual({ id: expect.any(Number), username: 'admin-renamed', email: 'admin-renamed@test.local', role: 'admin' });
+    expect(profile.body.passwordHash).toBeUndefined();
+
+    const wrongPassword = await request(app).post('/api/auth/change-password').set('Cookie', adminCookie).send({
+      currentPassword: 'wrong-password',
+      newPassword: 'new-test-password-123',
+    });
+    expect(wrongPassword.status).toBe(400);
+    expect(wrongPassword.body.code).toBe('INVALID_CURRENT_PASSWORD');
+
+    const changed = await request(app).post('/api/auth/change-password').set('Cookie', adminCookie).send({
+      currentPassword: password,
+      newPassword: 'new-test-password-123',
+    });
+    expect(changed.status).toBe(204);
+    expect(changed.body).toEqual({});
+
+    const oldSession = await request(app).get('/api/auth/me').set('Cookie', adminCookie);
+    expect(oldSession.status).toBe(401);
+    const newLogin = await request(app).post('/api/auth/login').send({ identifier: 'admin-renamed', password: 'new-test-password-123' });
+    expect(newLogin.status).toBe(200);
+    expect(newLogin.body.user.passwordHash).toBeUndefined();
+    expect(typeof newLogin.body.token).toBe('string');
+  });
+
   it('enforces viewer and staff roles', async () => {
     const viewerWrite = await request(app).post('/api/equipment-types').set('Cookie', viewerCookie).send({ name: 'Viewer type', unit: 'ชิ้น' });
     expect(viewerWrite.status).toBe(403);
@@ -95,6 +126,35 @@ describe('production API authentication and state transitions', () => {
     expect(staffDelete.status).toBe(403);
     const users = await request(app).get('/api/users').set('Cookie', staffCookie);
     expect(users.status).toBe(403);
+  });
+
+  it('supports safe admin user CRUD and protects the last administrator', async () => {
+    const created = await request(app).post('/api/users').set('Cookie', adminCookie).send({
+      username: 'managed-user',
+      email: 'managed-user@test.local',
+      password,
+      role: 'viewer',
+    });
+    expect(created.status).toBe(201);
+    expect(created.body).toMatchObject({ username: 'managed-user', role: 'viewer' });
+    expect(created.body.passwordHash).toBeUndefined();
+
+    const listed = await request(app).get('/api/users').set('Cookie', adminCookie);
+    expect(listed.status).toBe(200);
+    expect(listed.body).toEqual(expect.arrayContaining([expect.objectContaining({ id: created.body.id, username: 'managed-user' })]));
+
+    const updated = await request(app).put(`/api/users/${created.body.id}`).set('Cookie', adminCookie).send({ role: 'staff' });
+    expect(updated.status).toBe(200);
+    expect(updated.body).toMatchObject({ id: created.body.id, role: 'staff' });
+    expect(updated.body.passwordHash).toBeUndefined();
+
+    const removed = await request(app).delete(`/api/users/${created.body.id}`).set('Cookie', adminCookie);
+    expect(removed.status).toBe(204);
+
+    const admin = await prisma.user.findUniqueOrThrow({ where: { username: 'admin' } });
+    const demoted = await request(app).put(`/api/users/${admin.id}`).set('Cookie', adminCookie).send({ role: 'staff' });
+    expect(demoted.status).toBe(409);
+    expect(demoted.body.code).toBe('LAST_ADMIN_REQUIRED');
   });
 
   it('keeps issuance and repair status transitions consistent', async () => {
@@ -107,6 +167,9 @@ describe('production API authentication and state transitions', () => {
 
     const issuance = await request(app).post('/api/issuance-history').set('Cookie', staffCookie).send({ equipmentId: equipment.body.id, employeeId: employee.body.id });
     expect(issuance.status).toBe(201);
+    const issuanceHistory = await request(app).get('/api/issuance-history').set('Cookie', staffCookie).query({ startDate: '', endDate: '' });
+    expect(issuanceHistory.status).toBe(200);
+    expect(issuanceHistory.body).toMatchObject({ total: 1, data: [{ id: issuance.body.id }] });
     let current = await request(app).get('/api/equipment-instances').set('Cookie', staffCookie);
     expect(current.body.data[0].status).toBe('issued');
 

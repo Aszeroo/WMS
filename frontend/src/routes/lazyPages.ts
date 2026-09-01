@@ -6,6 +6,8 @@ export const pageLoaders = {
   issuance: () => import('../pages/IssuanceHistoryPage').then((module) => ({ default: module.IssuanceHistoryPage })),
   repair: () => import('../pages/RepairHistoryPage').then((module) => ({ default: module.RepairHistoryPage })),
   employees: () => import('../pages/EmployeeManagementPage').then((module) => ({ default: module.EmployeeManagementPage })),
+  profile: () => import('../pages/ProfilePage').then((module) => ({ default: module.ProfilePage })),
+  userManagement: () => import('../pages/UserManagementPage').then((module) => ({ default: module.UserManagementPage })),
 };
 
 const routeLoaders: Record<string, () => Promise<unknown>> = {
@@ -14,6 +16,9 @@ const routeLoaders: Record<string, () => Promise<unknown>> = {
   '/employees': pageLoaders.employees,
   '/issuance-history': pageLoaders.issuance,
   '/repair-history': pageLoaders.repair,
+  '/profile': pageLoaders.profile,
+  '/user-management': pageLoaders.userManagement,
+  '/users': pageLoaders.userManagement,
 };
 
 export const preloadRoute = (path: string): void => {

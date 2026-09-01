@@ -10,24 +10,25 @@ const menuLabel = (path: string, label: string) => (
   <span onPointerEnter={() => preloadRoute(path)}>{label}</span>
 );
 
-const menuItems = [
-  { key: '/dashboard', label: menuLabel('/dashboard', 'ภาพรวมระบบ') },
-  { key: '/equipment-management', label: menuLabel('/equipment-management', 'จัดการอุปกรณ์') },
-  { key: '/employees', label: menuLabel('/employees', 'จัดการพนักงาน') },
-  { key: '/issuance-history', label: menuLabel('/issuance-history', 'ประวัติการเบิก') },
-  { key: '/repair-history', label: menuLabel('/repair-history', 'ประวัติการซ่อม') },
-];
-
 const roleLabel = { admin: 'ผู้ดูแลระบบ', staff: 'เจ้าหน้าที่', viewer: 'ผู้ชม' } as const;
 
 export function AppLayout() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+  const menuItems = useMemo(() => [
+    { key: '/dashboard', label: menuLabel('/dashboard', 'ภาพรวมระบบ') },
+    { key: '/equipment-management', label: menuLabel('/equipment-management', 'จัดการอุปกรณ์') },
+    { key: '/employees', label: menuLabel('/employees', 'จัดการพนักงาน') },
+    { key: '/issuance-history', label: menuLabel('/issuance-history', 'ประวัติการเบิก') },
+    { key: '/repair-history', label: menuLabel('/repair-history', 'ประวัติการซ่อม') },
+    { key: '/profile', label: menuLabel('/profile', 'โปรไฟล์ของฉัน') },
+    ...(isAdmin ? [{ key: '/user-management', label: menuLabel('/user-management', 'จัดการผู้ใช้งาน') }] : []),
+  ], [isAdmin]);
   const selectedKey = useMemo(
     () => menuItems.find((item) => location.pathname.startsWith(item.key))?.key ?? '/dashboard',
-    [location.pathname],
+    [location.pathname, menuItems],
   );
 
   const signOut = async () => {
