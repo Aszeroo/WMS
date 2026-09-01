@@ -313,13 +313,18 @@ const writeAccess = requireRole('admin', 'staff');
 const adminAccess = requireRole('admin');
 
 app.get('/api/dashboard/stats', asyncHandler(async (_request, response) => {
-  const [total, available, issued, underRepair] = await Promise.all([
-    prisma.equipmentInstance.count(),
-    prisma.equipmentInstance.count({ where: { status: 'available' } }),
-    prisma.equipmentInstance.count({ where: { status: 'issued' } }),
-    prisma.equipmentInstance.count({ where: { status: 'under_repair' } }),
-  ]);
-  response.json({ total, available, issued, underRepair });
+  const grouped = await prisma.equipmentInstance.groupBy({
+    by: ['status'],
+    _count: { _all: true },
+  });
+  const counts = new Map(grouped.map((item) => [item.status, item._count._all]));
+  const total = grouped.reduce((sum, item) => sum + item._count._all, 0);
+  response.json({
+    total,
+    available: counts.get('available') ?? 0,
+    issued: counts.get('issued') ?? 0,
+    underRepair: counts.get('under_repair') ?? 0,
+  });
 }));
 
 app.get('/api/equipment-types', asyncHandler(async (_request, response) => {

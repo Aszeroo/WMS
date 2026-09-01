@@ -1,6 +1,6 @@
 # WMS2 — บันทึกสถานะงาน
 
-> อัปเดตล่าสุด: 31 สิงหาคม 2026 — กำลังดำเนินการ
+> อัปเดตล่าสุด: 1 กันยายน 2026 — กำลังตรวจสอบผล performance
 
 ## กติกาการอัปเดต
 
@@ -367,3 +367,36 @@
 
 - ปัญหา Login Internal server error ได้รับการแก้ไขที่ฐานข้อมูลแล้ว ไม่ต้อง redeploy โค้ด
 - ควรทดสอบ CRUD และ business flows จาก browser จริงต่อ และ rotate credential ที่เคยอยู่ในไฟล์ local/ประวัติการสนทนา
+
+## 1 กันยายน 2026 — ปรับปรุงความเร็วการตอบสนอง
+
+**แก้ไขแล้ว**
+
+- ปรับ `GET /api/dashboard/stats` ให้ใช้ Prisma `groupBy` เพียง query เดียว แทนการนับ 4 query แยกกัน โดยคง response shape เดิมและรองรับ status ที่ไม่มีข้อมูลด้วยค่า `0`
+- เพิ่ม in-memory TTL cache 30 วินาทีและ request deduplication สำหรับ lookup ที่เปลี่ยนไม่บ่อย (`equipment-types` และ `employees`)
+- invalidate lookup cache หลัง create/update/delete ของ equipment type และ employee เพื่อไม่ให้ข้อมูลใหม่ค้างอยู่หลัง mutation
+- เพิ่ม route-level chunk preload เมื่อผู้ใช้เลื่อน pointer เข้าเมนู โดยยังคง `React.lazy` และไม่โหลดทุกหน้าตั้งแต่ initial bundle
+- แยก `AppLayout` เป็น lazy chunk และตัดการ import `antd` จาก `App`/`ProtectedRoute` fallback เพื่อไม่ preload Ant Design shell ในเส้นทาง login
+- เพิ่ม regression tests สำหรับ dashboard aggregation และ cache TTL, deduplication และ invalidation
+
+**หลักการที่คงไว้**
+
+- ไม่ลด bcrypt work factor, ไม่ cache authentication และไม่ปิดการตรวจ `sessionVersion`
+- ไม่ cache history หรือ equipment instances ที่เปลี่ยนบ่อย
+- ยังไม่ตั้งค่า Vercel region หรือปรับ `manualChunks` โดยเดาสุ่ม เพราะต้องยืนยัน region ของ Neon และ critical-path bundle จาก production metrics ก่อน
+
+**ผลการตรวจสอบ**
+
+- backend typecheck ผ่าน
+- frontend typecheck ผ่าน
+- backend tests ผ่าน 8/8 และ frontend tests ผ่าน 6/6
+- production build ผ่านทั้ง backend และ frontend
+- จาก local production build, initial modulepreload chunk ลดจาก 729.60 kB (gzip 235.13 kB) เหลือ 439.77 kB (gzip 136.22 kB) หลังแยก shell และ fallback ออกจาก `antd`; ตัวเลขนี้ยังไม่ใช่ latency จาก production deployment จริง
+- หลังแยก shell แล้ว build ไม่แสดงคำเตือน Vite เรื่อง chunk ใหญ่กว่า 500 kB; เหลือคำเตือน Ant Design เรื่อง `Card bordered` ใน test ซึ่งไม่ทำให้ gate ล้มเหลว
+- วัด deployment ปัจจุบันแบบไม่ส่ง credential 3 ครั้ง: `/api/health` ได้ `200` ที่ประมาณ `3482, 516, 534 ms` และหน้า frontend ได้ `200` ที่ประมาณ `478, 49, 52 ms`; ค่านี้เป็น baseline ของ health/static เท่านั้น และยังไม่ใช่ผลของ source changes จนกว่าจะ deploy ใหม่
+
+**งานค้างถัดไป**
+
+- วัด `TTFB`, server processing และ download ของ login, `/auth/me`, dashboard และ endpoint หลักจาก browser Network ทั้ง cold/warm request
+- ตรวจ region ของ Vercel กับ Neon และพิจารณา `manualChunks` เฉพาะเมื่อ metrics ยืนยันว่าเป็นคอขวด
+- ทำ browser smoke test หลัง deploy และบันทึกค่า p50/p95 โดยไม่บันทึก token, password, connection string หรือ secret

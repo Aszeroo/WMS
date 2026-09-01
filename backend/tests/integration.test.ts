@@ -52,6 +52,21 @@ describe('production API authentication and state transitions', () => {
     expect((await request(app).get('/api/health')).status).toBe(200);
   });
 
+  it('aggregates dashboard counts by equipment status', async () => {
+    const type = await prisma.equipmentType.create({ data: { name: 'Dashboard type', unit: 'เครื่อง' } });
+    await prisma.equipmentInstance.createMany({ data: [
+      { serialNumber: 'DASH-001', typeId: type.id, status: 'available' },
+      { serialNumber: 'DASH-002', typeId: type.id, status: 'available' },
+      { serialNumber: 'DASH-003', typeId: type.id, status: 'issued' },
+      { serialNumber: 'DASH-004', typeId: type.id, status: 'under_repair' },
+    ] });
+
+    const stats = await request(app).get('/api/dashboard/stats').set('Cookie', staffCookie);
+
+    expect(stats.status).toBe(200);
+    expect(stats.body).toEqual({ total: 4, available: 2, issued: 1, underRepair: 1 });
+  });
+
   it('returns a safe user and revokes bearer tokens on logout', async () => {
     const me = await request(app).get('/api/auth/me').set('Cookie', adminCookie);
     expect(me.status).toBe(200);

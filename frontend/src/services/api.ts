@@ -1,4 +1,5 @@
 import axios from 'axios';
+import { getCached, invalidateCache } from './cache';
 import type {
   DashboardStats,
   Employee,
@@ -28,12 +29,23 @@ export const apiService = {
 
   getStats: () => api.get<DashboardStats>('/dashboard/stats').then((response) => response.data),
 
-  getTypes: () => api.get<EquipmentType[]>('/equipment-types').then((response) => response.data),
+  getTypes: () => getCached('equipment-types', () =>
+    api.get<EquipmentType[]>('/equipment-types').then((response) => response.data),
+  ),
   createType: (payload: { name: string; unit: string; description?: string }) =>
-    api.post<EquipmentType>('/equipment-types', payload).then((response) => response.data),
+    api.post<EquipmentType>('/equipment-types', payload).then((response) => {
+      invalidateCache('equipment-types');
+      return response.data;
+    }),
   updateType: (id: number, payload: Partial<{ name: string; unit: string; description: string }>) =>
-    api.put<EquipmentType>(`/equipment-types/${id}`, payload).then((response) => response.data),
-  deleteType: (id: number) => api.delete(`/equipment-types/${id}`),
+    api.put<EquipmentType>(`/equipment-types/${id}`, payload).then((response) => {
+      invalidateCache('equipment-types');
+      return response.data;
+    }),
+  deleteType: (id: number) => api.delete(`/equipment-types/${id}`).then((response) => {
+    invalidateCache('equipment-types');
+    return response;
+  }),
 
   getInstances: (params?: { page?: number; pageSize?: number; search?: string; status?: string; typeId?: number }) =>
     api.get<PageResult<EquipmentInstance>>('/equipment-instances', { params }).then((response) => response.data),
@@ -48,12 +60,23 @@ export const apiService = {
     api.put<EquipmentInstance>(`/equipment-instances/${id}`, payload).then((response) => response.data),
   deleteInstance: (id: number) => api.delete(`/equipment-instances/${id}`),
 
-  getEmployees: () => api.get<Employee[]>('/employees').then((response) => response.data),
+  getEmployees: () => getCached('employees', () =>
+    api.get<Employee[]>('/employees').then((response) => response.data),
+  ),
   createEmployee: (payload: { employeeId: string; name: string; department?: string; position?: string }) =>
-    api.post<Employee>('/employees', payload).then((response) => response.data),
+    api.post<Employee>('/employees', payload).then((response) => {
+      invalidateCache('employees');
+      return response.data;
+    }),
   updateEmployee: (id: number, payload: Partial<{ employeeId: string; name: string; department: string; position: string }>) =>
-    api.put<Employee>(`/employees/${id}`, payload).then((response) => response.data),
-  deleteEmployee: (id: number) => api.delete(`/employees/${id}`),
+    api.put<Employee>(`/employees/${id}`, payload).then((response) => {
+      invalidateCache('employees');
+      return response.data;
+    }),
+  deleteEmployee: (id: number) => api.delete(`/employees/${id}`).then((response) => {
+    invalidateCache('employees');
+    return response;
+  }),
 
   getIssuances: (params?: Record<string, string | number | boolean | undefined>) =>
     api.get<PageResult<Issuance>>('/issuance-history', { params }).then((response) => response.data),

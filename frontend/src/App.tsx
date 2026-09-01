@@ -1,23 +1,23 @@
-import { Spin } from 'antd';
 import { lazy, Suspense } from 'react';
 import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { AuthProvider } from './auth/AuthContext';
 import { ProtectedRoute } from './auth/ProtectedRoute';
-import { AppLayout } from './components/AppLayout';
+import { pageLoaders } from './routes/lazyPages';
 
-const LoginPage = lazy(() => import('./pages/LoginPage').then((module) => ({ default: module.LoginPage })));
-const DashboardPage = lazy(() => import('./pages/DashboardPage').then((module) => ({ default: module.DashboardPage })));
-const EquipmentManagementPage = lazy(() => import('./pages/EquipmentManagementPage').then((module) => ({ default: module.EquipmentManagementPage })));
-const IssuanceHistoryPage = lazy(() => import('./pages/IssuanceHistoryPage').then((module) => ({ default: module.IssuanceHistoryPage })));
-const RepairHistoryPage = lazy(() => import('./pages/RepairHistoryPage').then((module) => ({ default: module.RepairHistoryPage })));
-const EmployeeManagementPage = lazy(() => import('./pages/EmployeeManagementPage').then((module) => ({ default: module.EmployeeManagementPage })));
+const LoginPage = lazy(pageLoaders.login);
+const AppLayout = lazy(pageLoaders.layout);
+const DashboardPage = lazy(pageLoaders.dashboard);
+const EquipmentManagementPage = lazy(pageLoaders.equipment);
+const IssuanceHistoryPage = lazy(pageLoaders.issuance);
+const RepairHistoryPage = lazy(pageLoaders.repair);
+const EmployeeManagementPage = lazy(pageLoaders.employees);
 
 function NotFoundPage() {
   return <div className="not-found"><h1>ไม่พบหน้านี้</h1><p>กรุณาเลือกเมนูจากแถบด้านข้าง</p></div>;
 }
 
 function RouteFallback() {
-  return <div className="route-loading"><Spin size="large" tip="กำลังโหลดหน้า" /></div>;
+  return <div className="route-loading">กำลังโหลดหน้า</div>;
 }
 
 export default function App() {
