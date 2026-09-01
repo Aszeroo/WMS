@@ -313,3 +313,33 @@
 - ปรับ `.gitignore` ให้ ignore ทั้ง `.env` และไฟล์รูปแบบ `.env.*` ทุกระดับโฟลเดอร์ พร้อมยกเว้นเฉพาะ `.env.example` ซึ่งไม่มีค่าลับ
 - ไฟล์ `backend/.env` และ `frontend/.env` ที่ใช้เตรียม import เข้า Vercel จะไม่ถูกแสดงเป็นไฟล์สำหรับ commit เมื่อทำงานผ่าน Git
 - หากไฟล์ `.env` เคยถูก commit ไปแล้ว `.gitignore` จะไม่ลบออกจาก Git index อัตโนมัติ ต้องลบออกจาก repository และเปลี่ยน secret ทันที
+
+## 31 สิงหาคม 2026 — ตรวจซ้ำหลัง redeploy สำเร็จ
+
+- GitHub branch `main` มี commit ล่าสุด `3dd2cea` ชื่อ `Ignore environment files`
+- ตรวจ `https://backend-ten-psi-94.vercel.app/api/health` แล้วได้ `status: ok` และ `database: connected`; Backend และ PostgreSQL เชื่อมต่อสำเร็จ
+- ตรวจ `https://frontend-rose-one-72.vercel.app/` แล้วโหลดสำเร็จและพบ title `Equipment Desk`
+- สถานะ deployment หลักพร้อมสำหรับการทดสอบ login และ business flows; ยังควรทดสอบจาก browser จริงเพื่อยืนยัน CORS, cookie และการเรียก API จาก frontend
+
+## 31 สิงหาคม 2026 — จุดค้างก่อนปิดเครื่อง: สร้างบัญชี admin และแก้ login HTTP 500
+
+- ผู้ใช้ยังไม่มีบัญชี `admin`; การรัน `npm ci` และ `npm run generate` สำเร็จแล้ว โดย Prisma Client `6.19.0` ถูก generate จาก `.env` เรียบร้อย
+- Warning ที่พบระหว่าง generate เรื่อง `package.json#prisma` deprecated ใน Prisma 7 ยังไม่ใช่ failure และยังไม่ต้องแก้เพื่อทำงานต่อ
+- ผู้ใช้ต้องเพิ่มค่าเหล่านี้ใน `backend/.env` (ไฟล์นี้ห้าม commit): `ADMIN_USERNAME`, `ADMIN_EMAIL`, `ADMIN_PASSWORD` โดย password ต้องยาวอย่างน้อย 12 ตัวอักษร
+- หลังเปิดเครื่อง ให้เข้าโฟลเดอร์ `backend` แล้วตรวจ migration ก่อน:
+  ```bash
+  cd /home/wasu/claude_code/wms2/backend
+  npx prisma migrate status
+  ```
+- จากนั้น apply PostgreSQL migrations และสร้างบัญชี admin:
+  ```bash
+  npm run migrate:deploy
+  npm run seed
+  ```
+- ผลสำเร็จที่คาดหวัง: migration แสดงว่าไม่มีรายการค้าง และ seed แสดง `Created admin account: <username>` หรือ `Admin account already exists; bootstrap skipped: <username>`
+- การ login จาก frontend แสดง `Internal server error` ไม่ใช่เพียง invalid password; ตรวจสอบ live endpoint ด้วยข้อมูลปลอมแล้วพบว่า `POST /api/auth/login` ตอบ HTTP 500 แม้ username ไม่มีอยู่จริง สาเหตุที่ต้องตรวจลำดับแรกคือ production schema/migration หรือ Vercel `DATABASE_URL` ไม่ใช่รหัสผ่าน
+- เหตุผลที่ health ผ่านแต่ login 500 ได้: `/api/health` ตรวจเพียง `SELECT 1` จึงยืนยันแค่การเชื่อมต่อฐานข้อมูล ไม่ได้ยืนยันว่าตาราง `User` และคอลัมน์ตรงกับ Prisma schema
+- ถ้า `migrate:deploy` แจ้งปัญหา Neon pooler ให้ใช้ direct PostgreSQL connection string สำหรับ migration/seed; ห้ามส่ง `DATABASE_URL` หรือ password ในแชต
+- หลัง seed สำเร็จ ให้ลอง login ที่ `https://frontend-rose-one-72.vercel.app/`; ไม่ต้อง commit หรือ redeploy เพราะ seed เขียนลง PostgreSQL โดยตรง
+- หากยังได้ 500 หลัง migration และ seed สำเร็จ ให้เปิด Vercel Runtime Logs ของ Backend deployment ล่าสุด แล้วส่งเฉพาะ error ที่ลบ secret แล้ว หรือส่งผลลัพธ์ `npx prisma migrate status` และ `npm run seed` โดยไม่ส่งเนื้อหา `.env`
+- งานถัดไปหลัง login ผ่าน: ตรวจ logout/session revocation, CRUD, issuance/return, repair, role enforcement, CORS/cookie flags และ SPA refresh แล้วบันทึกผลต่อในไฟล์นี้
