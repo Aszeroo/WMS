@@ -501,3 +501,17 @@
 - เพิ่ม `MIN_PASSWORD_LENGTH` ใน `backend/src/auth.ts` เพื่อให้ backend schema และ seed ใช้ค่ากลางเดียวกัน
 - อัปเดต validation message ของ Profile/User Management รวมถึง `README.md` และ `backend/.env.example`
 - คง bcrypt work factor 12, การตรวจรหัสผ่านเดิม และ `sessionVersion` session revocation ไว้เหมือนเดิม
+
+## 1 กันยายน 2026 — deploy และส่งต่องาน
+
+- ผู้ใช้ยืนยันว่า deploy source การปรับนโยบายรหัสผ่านขึ้น production แล้ว และตรวจสอบการใช้งานเรียบร้อย
+- นโยบาย production ปัจจุบันกำหนดรหัสผ่านขั้นต่ำ 8 ตัวอักษร โดยยังคง bcrypt work factor 12 และ session revocation เหมือนเดิม
+- เพิ่ม regression coverage ให้รหัสผ่าน 8 ตัวอักษรผ่าน และรหัสผ่าน 7 ตัวอักษรถูกปฏิเสธ ทั้ง backend และ flow ที่เกี่ยวข้องของ frontend
+- ผลตรวจสอบหลังการแก้ไข: backend typecheck ผ่าน, backend tests 10/10 ผ่าน, frontend typecheck ผ่าน, frontend tests 12/12 ผ่านใน 7 test files, backend/frontend build ผ่าน และ `git diff --check` ผ่าน
+- Source changes ของนโยบายรหัสผ่านอยู่ใน commit `7e3a3fb` (`update system password`); รายงานส่วนนี้มีการแก้ไข `WORK_LOG.md` เพิ่มเติมที่ยังไม่ได้ commit
+
+**งานถัดไปเมื่อกลับมาทำต่อ**
+
+- วัด authenticated performance หลัง deploy จาก browser session ของผู้ใช้ โดยรายงานเฉพาะ status และ timing ที่ไม่ใช่ credential หรือ session token
+- ตรวจ Vercel cold/warm duration, region และ database latency จาก dashboard ก่อนพิจารณาปรับ infrastructure
+- พิจารณาแก้คำเตือน deprecation ของ Ant Design และ Prisma แยกเป็นงานบำรุงรักษา โดยไม่กระทบ policy ความปลอดภัยของ authentication
