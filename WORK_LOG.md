@@ -343,3 +343,27 @@
 - หลัง seed สำเร็จ ให้ลอง login ที่ `https://frontend-rose-one-72.vercel.app/`; ไม่ต้อง commit หรือ redeploy เพราะ seed เขียนลง PostgreSQL โดยตรง
 - หากยังได้ 500 หลัง migration และ seed สำเร็จ ให้เปิด Vercel Runtime Logs ของ Backend deployment ล่าสุด แล้วส่งเฉพาะ error ที่ลบ secret แล้ว หรือส่งผลลัพธ์ `npx prisma migrate status` และ `npm run seed` โดยไม่ส่งเนื้อหา `.env`
 - งานถัดไปหลัง login ผ่าน: ตรวจ logout/session revocation, CRUD, issuance/return, repair, role enforcement, CORS/cookie flags และ SPA refresh แล้วบันทึกผลต่อในไฟล์นี้
+
+## 1 กันยายน 2026 — แก้ Login Internal server error
+
+**สาเหตุที่ยืนยันแล้ว**
+
+- `prisma migrate status` พบว่า PostgreSQL production ยังไม่ได้ apply migration `20260831150000_postgresql_baseline`
+- สาเหตุที่ health ผ่านแต่ login ได้ HTTP 500 คือ `/api/health` ตรวจเพียง `SELECT 1` ขณะที่ login เรียกตาราง `User` ซึ่งยังไม่มี schema ที่จำเป็น
+
+**การแก้ไขและ verification**
+
+- รัน `npm run migrate:deploy` ใน `backend/` สำเร็จ และสร้าง schema จาก PostgreSQL baseline
+- รัน `npm run seed` สำเร็จ สร้างบัญชี admin ตาม environment ที่ตั้งไว้ โดยไม่บันทึกค่าลับลง log
+- ตรวจ `prisma migrate status` ซ้ำแล้วพบว่า database schema เป็นปัจจุบัน
+- ทดสอบ deployed login สำเร็จ HTTP 200 และได้ user ที่ปลอดภัยโดยไม่มี `passwordHash`
+- ทดสอบ `/api/auth/me` สำเร็จ, logout ได้ HTTP 204 และ session เดิมถูก revoke ได้ HTTP 401
+- ทดสอบข้อมูล login ผิดได้ HTTP 401 `INVALID_CREDENTIALS` แทน HTTP 500
+- รัน `npm run typecheck` จาก root ผ่าน
+- รัน `npm test` ผ่าน: backend 7/7 tests และ frontend 3/3 tests
+- รัน `npm run build` ผ่านทั้ง backend และ frontend; ยังคงมีคำเตือน Vite เรื่อง chunk ใหญ่และ Prisma package configuration deprecated ซึ่งไม่ทำให้ gate ล้มเหลว
+
+**สถานะ**
+
+- ปัญหา Login Internal server error ได้รับการแก้ไขที่ฐานข้อมูลแล้ว ไม่ต้อง redeploy โค้ด
+- ควรทดสอบ CRUD และ business flows จาก browser จริงต่อ และ rotate credential ที่เคยอยู่ในไฟล์ local/ประวัติการสนทนา
