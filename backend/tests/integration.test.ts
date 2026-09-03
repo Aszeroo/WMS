@@ -35,6 +35,7 @@ describe('production API authentication and state transitions', () => {
     await prisma.equipmentInstance.deleteMany();
     await prisma.employee.deleteMany();
     await prisma.equipmentType.deleteMany();
+    await prisma.auditLog.deleteMany();
     await prisma.user.deleteMany();
     await setupUsers();
     [adminCookie, staffCookie, viewerCookie] = await Promise.all([

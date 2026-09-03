@@ -24,6 +24,7 @@ import {
   setSessionCookie,
   verifyPassword,
 } from './auth';
+import { logAction, extractRequestInfo } from './audit';
 
 const globalForPrisma = globalThis as typeof globalThis & { __wmsPrisma?: PrismaClient };
 const prisma = globalForPrisma.__wmsPrisma ?? new PrismaClient();
@@ -85,6 +86,21 @@ const optionalDate = (body: JsonRecord, field: string): Date | null | undefined 
   if (typeof value !== 'string' && typeof value !== 'number') throw new HttpError(400, `${field} must be a valid date`, 'VALIDATION_ERROR');
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) throw new HttpError(400, `${field} must be a valid date`, 'VALIDATION_ERROR');
+  return date;
+};
+
+const optionalPastDate = (body: JsonRecord, field: string): Date | null | undefined => {
+  const date = optionalDate(body, field);
+  if (date === undefined) return undefined;
+  if (date === null) return null;
+  if (date > new Date()) throw new HttpError(400, `${field} cannot be a future date`, 'VALIDATION_ERROR');
+  return date;
+};
+
+const requiredPastDate = (body: JsonRecord, field: string): Date => {
+  const date = optionalPastDate(body, field);
+  if (date === undefined) throw new HttpError(400, `${field} is required and cannot be a future date`, 'VALIDATION_ERROR');
+  if (date === null) throw new HttpError(400, `${field} cannot be a future date`, 'VALIDATION_ERROR');
   return date;
 };
 
@@ -391,9 +407,22 @@ app.get('/api/equipment-types', asyncHandler(async (_request, response) => {
 
 app.post('/api/equipment-types', writeAccess, asyncHandler(async (request, response) => {
   const body = bodyOf(request);
-  response.status(201).json(await prisma.equipmentType.create({ data: {
+  const created = await prisma.equipmentType.create({ data: {
     name: requiredString(body, 'name'), unit: requiredString(body, 'unit'), description: optionalString(body, 'description'),
-  } }));
+  } });
+  // Log action
+  const { ipAddress, userAgent } = extractRequestInfo(request);
+  await logAction(
+    prisma,
+    'CREATE_EQUIPMENT_TYPE',
+    'EquipmentType',
+    created.id,
+    request.auth!.id,
+    created,
+    ipAddress,
+    userAgent
+  );
+  response.status(201).json(created);
 }));
 
 app.put('/api/equipment-types/:id', writeAccess, asyncHandler(async (request, response) => {
@@ -444,7 +473,7 @@ app.post('/api/equipment-instances', writeAccess, asyncHandler(async (request, r
   if (!type) throw new HttpError(400, 'Equipment type not found', 'NOT_FOUND');
   const data = serialNumbers.map((serialNumber) => ({
     serialNumber, typeId, brand: optionalString(body, 'brand') ?? null, model: optionalString(body, 'model') ?? null,
-    purchaseDate: optionalDate(body, 'purchaseDate') ?? null, status,
+    purchaseDate: optionalPastDate(body, 'purchaseDate') ?? null, status,
   }));
   const created = await prisma.$transaction(data.map((item) => prisma.equipmentInstance.create({ data: item, include: equipmentInclude })));
   response.status(201).json(created.length === 1 ? created[0] : created);
@@ -534,15 +563,49 @@ app.get('/api/issuance-history', asyncHandler(async (request, response) => {
   response.json(pagedResponse(data, total, page, pageSize));
 }));
 
-app.post('/api/issuance-history', writeAccess, asyncHandler(async (request, response) => {
+app.post('/api/issuance-history', requireAuth(prisma), asyncHandler(async (request, response) => {
   const body = bodyOf(request);
   const equipmentId = optionalNumber(body, 'equipmentId');
-  const employeeId = optionalNumber(body, 'employeeId');
   if (!equipmentId || !Number.isInteger(equipmentId) || equipmentId <= 0) throw new HttpError(400, 'equipmentId is required', 'VALIDATION_ERROR');
-  if (!employeeId || !Number.isInteger(employeeId) || employeeId <= 0) throw new HttpError(400, 'employeeId is required', 'VALIDATION_ERROR');
+
+  // Determine employeeId based on user role
+  let employeeId: number;
+  if (request.auth?.role === 'viewer') {
+    // Viewers can only create issuance for themselves
+    // First check if employee record exists for this user, if not create it
+    const employee = await prisma.employee.findFirst({ where: { employeeId: request.auth?.username } });
+    if (employee) {
+      employeeId = employee.id;
+    } else {
+      // Create employee record for viewer if it doesn't exist
+      const newEmployee = await prisma.employee.create({
+        data: {
+          employeeId: request.auth?.username ?? '',
+          name: request.auth?.username ?? '',
+        }
+      });
+      employeeId = newEmployee.id;
+    }
+
+    // Viewers cannot specify a return date when creating an issuance
+    // The equipment must be returned through the return process
+    if (body.returnDate !== undefined) {
+      throw new HttpError(400, 'Viewers cannot specify a return date when creating an issuance', 'VALIDATION_ERROR');
+    }
+  } else {
+    // Staff and admin can specify employeeId
+    const providedEmployeeId = optionalNumber(body, 'employeeId');
+    if (!providedEmployeeId || !Number.isInteger(providedEmployeeId) || providedEmployeeId <= 0) {
+      throw new HttpError(400, 'employeeId is required', 'VALIDATION_ERROR');
+    }
+    employeeId = providedEmployeeId;
+  }
+
   const issueDate = optionalDate(body, 'issueDate') ?? new Date();
   const returnDate = optionalDate(body, 'returnDate');
+  const dueDate = optionalDate(body, 'dueDate');
   if (returnDate && returnDate < issueDate) throw new HttpError(400, 'returnDate cannot be before issueDate', 'VALIDATION_ERROR');
+  if (dueDate && dueDate < issueDate) throw new HttpError(400, 'dueDate cannot be before issueDate', 'VALIDATION_ERROR');
   const data = await prisma.$transaction(async (transaction) => {
     const equipment = await transaction.equipmentInstance.findUnique({ where: { id: equipmentId } });
     if (!equipment) throw new HttpError(404, 'Equipment not found', 'NOT_FOUND');
@@ -552,12 +615,24 @@ app.post('/api/issuance-history', writeAccess, asyncHandler(async (request, resp
     const activeIssuance = await transaction.equipmentIssuance.findFirst({ where: { equipmentId, returnDate: null } });
     if (activeIssuance) throw new HttpError(409, 'Equipment already has an active issuance', 'INVALID_STATE_TRANSITION');
     const issuance = await transaction.equipmentIssuance.create({ data: {
-      equipmentId, employeeId, issueDate, returnDate,
+      equipmentId, employeeId, issueDate, returnDate, dueDate,
       building: optionalString(body, 'building'), floor: optionalString(body, 'floor'), jobNumber: optionalString(body, 'jobNumber'), notes: optionalString(body, 'notes'),
     } });
     await refreshEquipmentStatus(transaction, equipmentId);
     return transaction.equipmentIssuance.findUniqueOrThrow({ where: { id: issuance.id }, include: { equipment: { include: equipmentInclude }, employee: true } });
   });
+  // Audit logging
+  const { ipAddress, userAgent } = extractRequestInfo(request);
+  await logAction(
+    prisma,
+    'CREATE_ISSUANCE',
+    'EquipmentIssuance',
+    data.id,
+    request.auth!.id,
+    data,
+    ipAddress,
+    userAgent
+  );
   response.status(201).json(data);
 }));
 
@@ -569,9 +644,12 @@ app.put('/api/issuance-history/:id', writeAccess, asyncHandler(async (request, r
   const data: Prisma.EquipmentIssuanceUpdateInput = {};
   const issueDate = body.issueDate !== undefined ? requiredDate(body, 'issueDate') : existing.issueDate;
   const returnDate = body.returnDate !== undefined ? optionalDate(body, 'returnDate') : existing.returnDate;
+  const dueDate = body.dueDate !== undefined ? optionalDate(body, 'dueDate') : existing.dueDate;
   if (returnDate && returnDate < issueDate) throw new HttpError(400, 'returnDate cannot be before issueDate', 'VALIDATION_ERROR');
+  if (dueDate && dueDate < issueDate) throw new HttpError(400, 'dueDate cannot be before issueDate', 'VALIDATION_ERROR');
   if (body.issueDate !== undefined) data.issueDate = issueDate;
   if (body.returnDate !== undefined) data.returnDate = returnDate;
+  if (body.dueDate !== undefined) data.dueDate = dueDate;
   if (body.building !== undefined) data.building = optionalString(body, 'building');
   if (body.floor !== undefined) data.floor = optionalString(body, 'floor');
   if (body.jobNumber !== undefined) data.jobNumber = optionalString(body, 'jobNumber');
@@ -824,3 +902,4 @@ if (require.main === module) {
 
 export { app, prisma, startServer };
 export default app;
+// Hook test edit

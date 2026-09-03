@@ -58,6 +58,7 @@ model EquipmentIssuance {
   employeeId  Int
   issueDate   DateTime          @default(now())
   returnDate  DateTime?
+  dueDate     DateTime?
   building    String?
   floor       String?
   jobNumber   String?
@@ -70,6 +71,7 @@ model EquipmentIssuance {
   @@index([equipmentId, returnDate])
   @@index([issueDate])
   @@index([jobNumber])
+  @@index([dueDate])
 }
 
 model EquipmentRepair {
@@ -100,4 +102,22 @@ model User {
   sessionVersion Int      @default(0)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
+  auditLogs      AuditLog[] @relation("AuditLogUser")
+}
+
+model AuditLog {
+  id           Int      @id @default(autoincrement())
+  action       String   // e.g., "CREATE_EQUIPMENT", "UPDATE_USER", "DELETE_ISSUANCE"
+  entityType   String   // e.g., "EquipmentInstance", "User", "EquipmentIssuance"
+  entityId     Int?     // ID of the affected entity (can be null if entity was deleted)
+  userId       Int      // ID of the user who performed the action
+  user         User     @relation("AuditLogUser", fields: [userId], references: [id])
+  timestamp    DateTime @default(now())
+  changes      Json     // Store the changes made (as JSON object)
+  ipAddress    String?  // IP address of the user (optional)
+  userAgent    String?  // User agent string (optional)
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([timestamp])
 }

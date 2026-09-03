@@ -67,6 +67,7 @@ export interface Issuance {
   employeeId: number;
   issueDate: string;
   returnDate?: string | null;
+  dueDate?: string | null;
   building?: string | null;
   floor?: string | null;
   jobNumber?: string | null;

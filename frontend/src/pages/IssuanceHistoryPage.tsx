@@ -24,6 +24,7 @@ type IssuanceFormValues = {
   equipmentId: number;
   employeeId: number;
   issueDate?: string;
+  dueDate?: string;
   building?: string;
   floor?: string;
   jobNumber?: string;
@@ -86,7 +87,11 @@ export function IssuanceHistoryPage() {
 
   const submitIssuance = async (values: IssuanceFormValues) => {
     try {
-      await apiService.createIssuance({ ...values, issueDate: values.issueDate ? new Date(`${values.issueDate}T00:00:00`).toISOString() : undefined });
+      await apiService.createIssuance({
+        ...values,
+        issueDate: values.issueDate ? new Date(`${values.issueDate}T00:00:00`).toISOString() : undefined,
+        dueDate: values.dueDate ? new Date(`${values.dueDate}T00:00:00`).toISOString() : undefined
+      });
       message.success('บันทึกการเบิกอุปกรณ์แล้ว');
       setModalOpen(false);
       form.resetFields();
@@ -128,6 +133,7 @@ export function IssuanceHistoryPage() {
 
   const columns: TableProps<Issuance>['columns'] = [
     { title: 'วันที่เบิก', dataIndex: 'issueDate', key: 'issueDate', render: formatDate },
+    { title: 'วันที่ต้องคืน', dataIndex: 'dueDate', key: 'dueDate', render: formatDate },
     { title: 'อุปกรณ์', key: 'equipment', render: (_, item) => <><Typography.Text strong>{item.equipment.serialNumber}</Typography.Text><br /><Typography.Text type="secondary">{item.equipment.type?.name ?? '—'}</Typography.Text></> },
     { title: 'ผู้เบิก', key: 'employee', render: (_, item) => <><Typography.Text>{item.employee.name}</Typography.Text><br /><Typography.Text type="secondary">{item.employee.employeeId}</Typography.Text></> },
     { title: 'สถานที่', key: 'location', render: (_, item) => [item.building && `อาคาร ${item.building}`, item.floor && `ชั้น ${item.floor}`].filter(Boolean).join(' · ') || '—' },
@@ -140,7 +146,7 @@ export function IssuanceHistoryPage() {
 
   return (
     <div className="page-stack">
-      <section className="page-intro"><div><Typography.Text className="eyebrow">LENDING LOG</Typography.Text><Typography.Title level={2}>ประวัติการเบิก</Typography.Title><Typography.Paragraph>ติดตามว่าอุปกรณ์อยู่กับใครและถูกนำไปใช้งานที่ใด</Typography.Paragraph></div>{canWrite && <Space wrap><Button onClick={() => setEmployeeModalOpen(true)}>+ เพิ่มพนักงาน</Button><Button type="primary" onClick={() => { form.resetFields(); form.setFieldValue('issueDate', new Date().toISOString().slice(0, 10)); setModalOpen(true); }}>+ บันทึกการเบิก</Button></Space>}</section>
+      <section className="page-intro"><div><Typography.Text className="eyebrow">LENDING LOG</Typography.Text><Typography.Title level={2}>ประวัติการเบิก</Typography.Title><Typography.Paragraph>ติดตามว่าอุปกรณ์อยู่กับใครและถูกนำไปใช้งานที่ใด</Typography.Paragraph></div>{canWrite && <Button type="primary" onClick={() => { form.resetFields(); form.setFieldValue('issueDate', new Date().toISOString().slice(0, 10)); setModalOpen(true); }}>+ บันทึกการเบิก</Button>}</section>
       {error && <Alert type="error" showIcon message={error} />}
       <Card bordered={false} className="content-card">
         <form className="filter-bar" onSubmit={applyFilters}>
@@ -159,6 +165,7 @@ export function IssuanceHistoryPage() {
           <Form.Item name="equipmentId" label="อุปกรณ์" rules={[{ required: true, message: 'กรุณาเลือกอุปกรณ์' }]}><Select showSearch optionFilterProp="label" placeholder="เลือกอุปกรณ์ที่พร้อมใช้งาน" options={equipment.map((item) => ({ value: item.id, label: `${item.serialNumber} — ${item.type?.name ?? ''}` }))} /></Form.Item>
           <Form.Item name="employeeId" label="ผู้เบิก" rules={[{ required: true, message: 'กรุณาเลือกผู้เบิก' }]}><Select showSearch optionFilterProp="label" placeholder={employees.length ? 'เลือกพนักงาน' : 'กรุณาเพิ่มพนักงานก่อน'} options={employees.map((item) => ({ value: item.id, label: `${item.name} (${item.employeeId})` }))} /></Form.Item>
           <Form.Item name="issueDate" label="วันที่เบิก"><Input type="date" /></Form.Item>
+          <Form.Item name="dueDate" label="วันที่ต้องคืน"><Input type="date" /></Form.Item>
           <div className="form-grid"><Form.Item name="building" label="อาคาร"><Input placeholder="เช่น A" /></Form.Item><Form.Item name="floor" label="ชั้น"><Input placeholder="เช่น 2" /></Form.Item></div>
           <Form.Item name="jobNumber" label="หมายเลข JOB"><Input placeholder="เช่น JOB-2026-001" /></Form.Item>
           <Form.Item name="notes" label="หมายเหตุ"><Input.TextArea rows={3} /></Form.Item>

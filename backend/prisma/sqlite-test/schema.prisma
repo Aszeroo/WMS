@@ -1,4 +1,3 @@
-// Test-only schema. Production deployments use schema.prisma with PostgreSQL.
 generator client {
   provider = "prisma-client-js"
 }
@@ -21,18 +20,18 @@ model EquipmentType {
 }
 
 model EquipmentInstance {
-  id           Int               @id @default(autoincrement())
-  serialNumber String            @unique
+  id           Int                 @id @default(autoincrement())
+  serialNumber String              @unique
   brand        String?
   model        String?
   purchaseDate DateTime?
-  status       String            @default("available")
+  status       String              @default("available")
   typeId       Int
-  type         EquipmentType     @relation(fields: [typeId], references: [id], onDelete: Restrict)
+  createdAt    DateTime            @default(now())
+  updatedAt    DateTime            @updatedAt
+  type         EquipmentType       @relation(fields: [typeId], references: [id])
   issuances    EquipmentIssuance[]
   repairs      EquipmentRepair[]
-  createdAt    DateTime          @default(now())
-  updatedAt    DateTime          @updatedAt
 
   @@index([status])
   @@index([typeId])
@@ -45,10 +44,10 @@ model Employee {
   name       String
   department String?
   position   String?
-  issuances  EquipmentIssuance[]
-  repairs    EquipmentRepair[]
   createdAt  DateTime            @default(now())
   updatedAt  DateTime            @updatedAt
+  issuances  EquipmentIssuance[]
+  repairs    EquipmentRepair[]
 
   @@index([name])
 }
@@ -63,10 +62,10 @@ model EquipmentIssuance {
   floor       String?
   jobNumber   String?
   notes       String?
-  equipment   EquipmentInstance @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
-  employee    Employee          @relation(fields: [employeeId], references: [id], onDelete: Restrict)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
+  employee    Employee          @relation(fields: [employeeId], references: [id])
+  equipment   EquipmentInstance @relation(fields: [equipmentId], references: [id])
 
   @@index([equipmentId, returnDate])
   @@index([issueDate])
@@ -82,10 +81,10 @@ model EquipmentRepair {
   status      String            @default("reported")
   repairedBy  String?
   notes       String?
-  equipment   EquipmentInstance @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
-  employee    Employee?         @relation(fields: [employeeId], references: [id], onDelete: SetNull)
   createdAt   DateTime          @default(now())
   updatedAt   DateTime          @updatedAt
+  employee    Employee?         @relation(fields: [employeeId], references: [id])
+  equipment   EquipmentInstance @relation(fields: [equipmentId], references: [id])
 
   @@index([equipmentId, status])
   @@index([employeeId])
@@ -93,12 +92,30 @@ model EquipmentRepair {
 }
 
 model User {
-  id             Int      @id @default(autoincrement())
-  username       String   @unique
-  email          String   @unique
+  id             Int        @id @default(autoincrement())
+  username       String     @unique
+  email          String     @unique
   passwordHash   String
-  role           String   @default("viewer")
-  sessionVersion Int      @default(0)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  role           String     @default("viewer")
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  sessionVersion Int        @default(0)
+  auditLogs      AuditLog[] @relation("AuditLogUser")
+}
+
+model AuditLog {
+  id         Int      @id @default(autoincrement())
+  action     String
+  entityType String
+  entityId   Int?
+  userId     Int
+  timestamp  DateTime @default(now())
+  changes    Json
+  ipAddress  String?
+  userAgent  String?
+  user       User     @relation("AuditLogUser", fields: [userId], references: [id])
+
+  @@index([entityType, entityId])
+  @@index([userId])
+  @@index([timestamp])
 }
