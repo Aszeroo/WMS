@@ -66,7 +66,7 @@ model EquipmentIssuance {
   equipment   EquipmentInstance @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
   employee    Employee          @relation(fields: [employeeId], references: [id], onDelete: Restrict)
   createdAt   DateTime          @default(now())
-  updatedAt   DateTime          @updatedAt
+  updatedAt   DateTime            @updatedAt
 
   @@index([equipmentId, returnDate])
   @@index([issueDate])
@@ -85,8 +85,8 @@ model EquipmentRepair {
   notes       String?
   equipment   EquipmentInstance @relation(fields: [equipmentId], references: [id], onDelete: Restrict)
   employee    Employee?         @relation(fields: [employeeId], references: [id], onDelete: SetNull)
-  createdAt   DateTime           @default(now())
-  updatedAt   DateTime           @updatedAt
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime            @updatedAt
 
   @@index([equipmentId, status])
   @@index([employeeId])
