@@ -1,5 +1,5 @@
 # WMS2 — บันทึกสถานะงาน
-> อัปเดตล่าสุด: 3 กันยายน 2026, 10:30 — แก้ไข Hooks, ตรรกะการเบิกสำหรับผู้ใช้ทั่วไป, เพิ่มระบบตรวจสอบการกระทำ และเพิ่มฟิลด์ dueDate
+> อัปเดตล่าสุด: 3 กันยายน 2026, 15:00 — พบ Network Error และบันทึกแผนการแก้ไขสำหรับครั้งต่อไป
 
 ## กติกาการอัปเดต
 
@@ -595,3 +595,19 @@
 - วัด authenticated performance หลัง deploy จาก browser session ของผู้ใช้ โดยรายงานเฉพาะ status และ timing ที่ไม่ใช่ credential หรือ session token
 - ตรวจ Vercel cold/warm duration, region และ database latency จาก dashboard ก่อนพิจารณาปรับ infrastructure
 - พิจารณาแก้คำเตือน deprecation ของ Ant Design และ Prisma แยกเป็นงานบำรุงรักษา โดยไม่กระทบ policy ความปลอดภัยของ authentication
+
+## 3 กันยายน 2026, 15:00 — พบ Network Error และบันทึกแผนการแก้ไขสำหรับครั้งต่อไป
+
+**สรุปปัญหา**
+- ขณะทำการทดสอบหรือสร้างระบบ พบว่าเกิด Network Error (ไม่สามารถเชื่อมต่อไปยัง backend หรือบริการภายนอกได้)
+- สาเหตุเบื้องต้นอาจมาจากการตั้งค่า proxy, CORS, หรือการทำงานของ Vercel dev server ในสภาพแวดล้อมท้องถิ่น
+
+**แผนการแก้ไขสำหรับครั้งต่อไป**
+1. ตรวจสอบการตั้งค่า CORS ใน backend (src/server.ts) ให้แน่ใจว่าอนุญาต origin ของ frontend ตามที่ต้องการ
+2. ตรวจสอบตัวแปรสภาพแวดล้อม VITE_API_URL ใน frontend/src/services/api.ts ว่าชี้ไปยัง backend ที่ถูกต้อง (ใน development ควรเป็น http://localhost:5000/api)
+3. หากใช้ docker-compose หรือ Vercel dev ให้ตรวจสอบว่า backend service กำลังทำงานและเปิดพอร์ตที่ถูกต้อง
+4. ลองทำการ request ไปยัง API ผ่าน curl หรือ Postman เพื่อยืนยันว่า backend ตอบสนองได้
+5. ตรวจสอบ console ของเบราว์เซอร์เพื่อดูข้อความ error ที่ชัดเจนมากขึ้น
+
+**หมายเหตุ**
+- หลังแก้ไขปัญหา Network Error แล้ว ให้ดำเนินการต่อกับงานที่ค้างอยู่ตามรายการในหัวข้อ "งานค้างถัดไป" ของการอัปเดตล่าสุด
