@@ -11,13 +11,27 @@
 - `docker-compose.yml` — ทางเลือกสำหรับรัน stack แบบ container โดยใช้ PostgreSQL ภายนอก
 - `WORK_LOG.md` — บันทึกการทำงานหลักเพียงไฟล์เดียว
 
-## Deploy บน Vercel + PostgreSQL
+## Deploy บน Vercel + PostgreSQL (รองรับ Supabase)
 
 ระบบนี้ออกแบบให้สร้าง **สอง Vercel Projects จาก repository เดียวกัน** เพื่อให้แต่ละส่วนใช้ dependency และ build context ของตนเอง
 
-### 1. สร้าง PostgreSQL
+### 1. สร้างฐานข้อมูล PostgreSQL
 
-สร้าง database จาก Neon, Vercel Postgres หรือผู้ให้บริการ PostgreSQL ที่รองรับ connection จาก serverless และเตรียม connection string ที่มี `sslmode=require` ตามข้อกำหนดของผู้ให้บริการ ห้ามใช้ `file:...` หรือ SQLite เป็นฐานข้อมูล production บน Vercel
+คุณสามารถใช้ผู้ให้บริการ PostgreSQL ใดๆ ที่รองรับการเชื่อมต่อจาก serverless รวมถึง:
+
+- **Vercel Postgres** (built-in)
+- **Neon**
+- **Supabase** (แนะนำสำหรับความง่ายในการจัดการและ UI)
+- ผู้ให้บริการคลาวด์อื่นๆ เช่น AWS RDS, Google Cloud SQL, ฯลฯ
+
+สร้างฐานข้อมูลและเตรียม connection string ที่มี `sslmode=require` (หากผู้ให้บริการต้องการ) ห้ามใช้ `file:...` หรือ SQLite เป็นฐานข้อมูล production บน Vercel
+
+**ตัวอย่าง connection string จาก Supabase**  
+หลังสร้างโปรเจกต์ใน Supabase ไปที่ **Settings → Database** แล้วคัดลอก URI ซึ่งมีหน้าตาประมาณ:
+
+```
+postgresql://postgres:[YOUR-PASSWORD]@db.[YOUR-PROJECT-ID].supabase.co:5432/postgres
+```
 
 ### 2. Deploy backend project
 
@@ -25,7 +39,7 @@
 
 - **Root Directory:** `backend`
 - **Framework Preset:** Other
-- **Build Command:** `npm run build`
+- **Build Command:** `npm run vercel-build`  (ดูขั้นตอนเพิ่มเติมด้านล่าง)
 - **Install Command:** `npm ci --include=dev`
 - **Output Directory:** เว้นว่าง (เป็น Node.js Function)
 
@@ -43,7 +57,45 @@ TRUST_PROXY=true
 
 `ADMIN_USERNAME`, `ADMIN_EMAIL` และ `ADMIN_PASSWORD` ไม่จำเป็นต่อ build และไม่ควรเก็บใน repository ให้ใช้เฉพาะขั้นตอน seed ที่ปลอดภัยด้านล่าง
 
-หลังติดตั้ง dependencies ให้ apply migration กับ database **ครั้งเดียวก่อนเปิดใช้งาน**:
+#### สคริปต์ build เฉพาะสำหรับ Vercel (เพื่อให้รัน migration ก่อน start)
+
+ในไฟล์ `backend/package.json` ได้เพิ่มสคริปต์ `vercel-build` ดังนี้:
+
+```json
+"scripts": {
+  "dev": "tsx watch src/server.ts",
+  "build": "prisma generate && tsc",                    // สำหรับ dev ที่ไม่ต้องการรัน migration ทุกครั้ง
+  "vercel-build": "prisma generate && prisma migrate deploy && tsc",
+  "start": "node dist/server.js",
+  "seed": "tsx prisma/seed.ts"
+}
+```
+
+และไฟล์ `backend/vercel.json` ถูกตั้งค่าให้ใช้สคริปต์นี้:
+
+```json
+{
+  "version": 2,
+  "buildCommand": "npm run vercel-build",
+  "installCommand": "npm ci --include=dev",
+  "functions": {
+    "api/index.ts": {
+      "maxDuration": 30
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/api/index.ts" }
+  ]
+}
+```
+
+**ผลลัพธ์:** เมื่อ Vercel ทำการ Build จะ:
+1. สร้าง Prisma Client (`prisma generate`)  
+2. รัน `prisma migrate deploy` กับฐานข้อมูลผลิต (จากตัวแปร `DATABASE_URL`) → สร้าง/อัปเดตตารางให้พร้อมใช้งาน  
+3. คอมไพล์ TypeScript เป็น JavaScript (`tsc`)  
+4. ส่งไฟล์ที่ได้ในโฟลเดอร์ `dist/` ไปเป็นฟังก์ชัน Serverless  
+
+หลังติดตั้ง dependencies ให้ apply migration กับ database **ครั้งเดียวก่อนเปิดใช้งาน** (หากยังไม่ได้รันผ่านขั้นตอน build แล้ว):
 
 ```bash
 cd backend
@@ -92,23 +144,25 @@ VITE_API_URL=https://<ชื่อ-backend-project>.vercel.app/api
 
 ### ลำดับ deploy ที่ถูกต้อง
 
-1. สร้าง PostgreSQL และเก็บ connection string เป็น secret
-2. Deploy backend function
-3. รัน `prisma migrate deploy` กับ PostgreSQL
-4. รัน seed admin แยกจาก build
-5. Deploy frontend พร้อม `VITE_API_URL`
-6. ตั้งค่า `CORS_ORIGIN` เป็น frontend URL แล้วตรวจ health, login, logout และ flow ธุรกิจ
+1. สร้าง PostgreSQL (รวม Supabase) และเก็บ connection string เป็น secret  
+2. Deploy backend function  
+3. รัน `prisma migrate deploy` กับ PostgreSQL (หากยังไม่ได้ทำในขั้นตอน build)  
+4. รัน seed admin แยกจาก build  
+5. Deploy frontend พร้อม `VITE_API_URL`  
+6. ตั้งค่า `CORS_ORIGIN` เป็น frontend URL แล้วตรวจ health, login, logout และ flow ธุรกิจ  
 
 Vercel build จะไม่รัน migration หรือ seed อัตโนมัติ เพื่อป้องกัน build preview แก้ไขฐานข้อมูล production โดยไม่ตั้งใจ
 
 ## เริ่มต้นพัฒนาในเครื่อง
 
-ต้องใช้ PostgreSQL ที่เข้าถึงได้จากเครื่อง และคัดลอกตัวอย่าง environment ก่อน:
+ต้องใช้ PostgreSQL ที่เข้าถึงได้จากเครื่อง (หรือใช้ Supabase เพื่อความสอดคล้องกับ production) และคัดลอกตัวอย่าง environment ก่อน:
 
 ```bash
 npm run install:all
 cp backend/.env.example backend/.env
 # แก้ DATABASE_URL, SESSION_SECRET และค่าที่จำเป็นใน backend/.env
+# ตัวอย่าง DATABASE_URL สำหรับ Supabase:
+# DATABASE_URL="postgresql://postgres:your-password@db.xxxxxx.supabase.co:5432/postgres"
 npm run generate --prefix backend
 npm run migrate:deploy --prefix backend
 npm run seed --prefix backend
@@ -147,23 +201,23 @@ docker compose down
 
 ## Auth และสิทธิ์
 
-- `POST /api/auth/login` รับ `identifier` หรือ `username`/`email` และ `password` คืน user ที่ไม่มี `passwordHash` พร้อม bearer token fallback
-- `POST /api/auth/logout` ล้าง `httpOnly` cookie และเพิ่ม `sessionVersion` เพื่อ revoke token เดิม
-- `GET /api/auth/me` ตรวจสอบ session ปัจจุบัน
-- session ใช้ cookie ชื่อ `wms_session`; API client อื่นใช้ `Authorization: Bearer <token>` ได้
-- `admin` จัดการข้อมูลและผู้ใช้รวมถึงลบข้อมูล, `staff` สร้าง/แก้ไขได้แต่ลบไม่ได้, `viewer` อ่านได้เท่านั้น
-- ข้อมูลธุรกิจทุก endpoint ต้อง login ส่วน `/`, `/health`, `/api/health` และ login/logout เป็น public
+- `POST /api/auth/login` รับ `identifier` หรือ `username`/`email` และ `password` คืน user ที่ไม่มี `passwordHash` พร้อม bearer token fallback  
+- `POST /api/auth/logout` ล้าง `httpOnly` cookie และเพิ่ม `sessionVersion` เพื่อ revoke token เดิม  
+- `GET /api/auth/me` ตรวจสอบ session ปัจจุบัน  
+- session ใช้ cookie ชื่อ `wms_session`; API client อื่นใช้ `Authorization: Bearer <token>` ได้  
+- `admin` จัดการข้อมูลและผู้ใช้รวมถึงลบข้อมูล, `staff` สร้าง/แก้ไขได้แต่ลบไม่ได้, `viewer` อ่านได้เท่านั้น  
+- ข้อมูลธุรกิจทุก endpoint ต้อง login ส่วน `/`, `/health`, `/api/health` และ login/logout เป็น public  
 
 ## API หลัก
 
-- `GET /api/health` — ตรวจสอบ API และ database
-- `GET|POST|PUT|DELETE /api/equipment-types`
-- `GET|POST|PUT|DELETE /api/equipment-instances`
-- `GET|POST|PUT|DELETE /api/employees`
-- `GET|POST|PUT|DELETE /api/issuance-history`
-- `GET|POST|PUT|DELETE /api/repair-history`
-- `GET|POST|PUT|DELETE /api/users` — เฉพาะ admin
-- `GET /api/dashboard/stats`
+- `GET /api/health` — ตรวจสอบ API และ database  
+- `GET|POST|PUT|DELETE /api/equipment-types`  
+- `GET|POST|PUT|DELETE /api/equipment-instances`  
+- `GET|POST|PUT|DELETE /api/employees`  
+- `GET|POST|PUT|DELETE /api/issuance-history`  
+- `GET|POST|PUT|DELETE /api/repair-history`  
+- `GET|POST|PUT|DELETE /api/users` — เฉพาะ admin  
+- `GET /api/dashboard/stats`  
 
 การสร้าง equipment instances รองรับ `serialNumbers` เป็น array ระบบป้องกันการเบิกอุปกรณ์ที่ไม่พร้อมใช้งาน ป้องกันการแจ้งซ่อมขณะยังถูกเบิก และปรับสถานะอุปกรณ์อัตโนมัติเมื่อเบิก คืน หรือเปลี่ยนสถานะงานซ่อม
 
@@ -181,8 +235,8 @@ Backend tests ใช้ `backend/prisma/sqlite-test/schema.prisma` และฐ�
 
 ## Environment files
 
-- `.env.example` — ตัวอย่างสำหรับ Docker Compose
-- `backend/.env.example` — backend local/Vercel และคำสั่ง seed
-- `frontend/.env.example` — frontend local และ URL backend production
+- `.env.example` — ตัวอย่างสำหรับ Docker Compose  
+- `backend/.env.example` — backend local/Vercel และคำสั่ง seed  
+- `frontend/.env.example` — frontend local และ URL backend production  
 
 ไฟล์ `.env` จริง, connection string, password และ session secret ต้องไม่ commit หรือเผยแพร่

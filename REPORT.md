@@ -56,12 +56,33 @@
   - `/home/wasu/claude_code/wms2/frontend/src/pages/IssuanceHistoryPage.tsx`
   - `/home/wasu/claude_code/wms2/frontend/src/types/index.ts`
 
+### 6. Migration to Supabase/PostgreSQL and Vercel Build Preparation
+- **Issue**: The system previously used SQLite for development, which is not suitable for Vercel serverless deployments due to its file‑based nature and lack of persistence.
+- **Fix**: 
+  - Changed Prisma provider from `sqlite` to `postgresql` in `backend/prisma/schema.prisma`.
+  - Added a Vercel‑specific build script `vercel-build` that runs `prisma generate && prisma migrate deploy && tsc` so that migrations are applied automatically during Vercel deployment.
+  - Updated `backend/vercel.json` to use the new build script.
+  - Provided example environment variables in `backend/.env.example` and `frontend/.env.example` for Supabase/PostgreSQL.
+  - Updated documentation in `README.md` (section “Deploy บน Vercel + PostgreSQL (รองรับ Supabase)”) with step‑by‑step instructions for creating a Supabase project, setting `DATABASE_URL`, and configuring Vercel environment variables.
+  - Cleaned up temporary test files and logs to keep the repository tidy.
+- **Files Modified**:
+  - `/home/wasu/claude_code/wms2/backend/prisma/schema.prisma`
+  - `/home/wasu/claude_code/wms2/backend/package.json` (added `vercel-build` script)
+  - `/home/wasu/claude_code/wms2/backend/vercel.json` (changed `buildCommand`)
+  - `/home/wasu/claude_code/wms2/backend/.env.example`
+  - `/home/wasu/claude_code/wms2/frontend/.env.example`
+  - `/home/wasu/claude_code/wms2/README.md`
+  - `/home/wasu/claude_code/wms2/WORK_LOG.md` (added entry for 2026-09-04)
+  - Removed temporary files: `backend/test_api.js`, `backend/test_api2.js`, `backend/test.js`, `backend/server.log`, `backend/server.pid`, `backend/backend.log`, `backend/backend.pid`, `frontend/frontend.log`, `frontend/frontend.pid`
+
 ## Verification
 - TypeScript compilation passes with no errors.
 - The system now allows viewers to create issuances without being able to set a returnDate.
 - Viewers cannot update issuances (including setting returnDate) due to `writeAccess` restriction.
 - Audit logs are created for equipment type and issuance creation.
 - Due date field is correctly stored, validated, and displayed in the issuance history.
+- Backend builds successfully with the new `vercel-build` script, applying migrations against a PostgreSQL (Supabase) database.
+- Health endpoint returns `{"status":"ok","database":"connected", ...}` when connected to Supabase.
 
 ## Future Improvements (Recommended)
 Based on the initial report, the following improvements are still pending:

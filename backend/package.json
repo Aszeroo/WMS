@@ -16,6 +16,7 @@
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "build": "prisma generate && tsc",
+    "vercel-build": "prisma generate && prisma migrate deploy && tsc",
     "start": "node dist/server.js",
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",

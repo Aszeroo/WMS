@@ -1,3 +1,13 @@
+## 4 กันยายน 2026, 10:00:00 — เปลี่ยนฐานข้อมูลเป็น Supabase (PostgreSQL) และอัปเดตเอกสาร
+
+- เปลี่ยนการตั้งค่า Prisma จาก SQLite เป็น PostgreSQL เพื่อใช้งานกับ Supabase (หรือผู้ให้บริการ PostgreSQL อื่นๆ)
+- เพิ่มเอกสารใน README.md ที่อธิบายวิธีการสร้างโปรเจกต์ Supabase, ตั้งค่า connection string, ตัวแปร environment, และสคริปต์ vercel-build เพื่อให้ migration ระหว่าง deploy บน Vercel ทำงานอัตโนมัติ
+- อัปเดตไฟล์ backend/package.json เพิ่มสคริปต์ "vercel-build": "prisma generate && prisma migrate deploy && tsc"
+- อัปเดตไฟล์ backend/vercel.json ให้ใช้ buildCommand ดังกล่าว
+- เพิ่มส่วน Supabase ใน README.md ภายใต้หัวข้อ "Deploy บน Vercel + PostgreSQL (รองรับ Supabase)"
+- ทดสอบการเชื่อมต่อในเครื่องด้วยการกำหนด DATABASE_URL จาก Supabase รัน prisma migrate deploy และ seed เพื่อสร้างผู้ดูแลระบบ
+- ยืนยันว่า health endpoint ของ backend ทำงานได้ปกติเมื่อเชื่อมต่อกับ Supabase
+
 # WMS2 — บันทึกสถานะงาน
 > อัปเดตล่าสุด: 3 กันยายน 2026, 15:00 — พบ Network Error และบันทึกแผนการแก้ไขสำหรับครั้งต่อไป
 
