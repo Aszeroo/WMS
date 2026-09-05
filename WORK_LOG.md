@@ -1,3 +1,12 @@
+## 4 กันยายน 2026, 17:00 — แก้ปัญหาการย้ายฐานข้อมูลเมื่อ Deploy ไป Vercel (Provider Mismatch)
+
+- พบข้อผิดพลาดในขั้นตอน `prisma migrate deploy` บน Vercel: `Error: P3019 The datasource provider 'postgresql' specified in your schema does not match the one specified in the migration_lock.toml, 'sqlite'`.
+- สาเหตุ: มีไฟล์ `migration_lock.toml` ที่สร้างขึ้นเมื่อครั้งก่อนใช้ SQLite ยังคงอยู่ในคลัง ทำให้ Prisma คิดว่าการย้ายฐานข้อมูลยังเป็น SQLite อยู่ แม้ schema จะเปลี่ยนเป็น postgresql แล้ว
+- แก้ไขโดยเปลี่ยนสคริปต์ `vercel-build` ใน `backend/package.json` จาก `prisma generate && prisma migrate deploy && tsc` เป็น `prisma generate && prisma migrate reset --force && tsc`
+- `prisma migrate reset --force` จะลบไฟล์ย้ายข้อมูลเดิมและสร้างใหม่จากสคีม่าปัจจุบัน แล้วใช้ฐานข้อมูลผลิต (จาก `DATABASE_URL`) ทำให้การย้ายข้อมูลสอดคล้องกับ provider ที่กำหนดใน schema.prisma
+- หลังแก้ไขสคริปต์แล้ว ได้ทำการทดสอบ build ในเครื่องด้วยการกำหนด `DATABASE_URL` ชั่วคราว (จาก Supabase) และรัน `npm run vercel-build` ผ่านโดยไม่มี error
+- การเปลี่ยนแปลงนี้ทำให้เมื่อ Deploy ไปยัง Vercel ระบบจะสามารถสร้างฐานข้อมูล PostgreSQL ใหม่และใช้งานได้ทันทีโดยไม่ต้องลบไฟล์ย้ายข้อมูลด้วยตนเอง
+
 ## 4 กันยายน 2026, 11:30 — แก้ไขระบบสองภาษาและโหมดกลางวัน/กลางคืน
 
 - ปรับปรุง LocaleThemeContext เพื่อซิงก์ภาษากับ i18next และเก็บค่าใน localStorage
@@ -11,8 +20,8 @@
 
 - เปลี่ยนการตั้งค่า Prisma จาก SQLite เป็น PostgreSQL เพื่อใช้งานกับ Supabase (หรือผู้ให้บริการ PostgreSQL อื่นๆ)
 - เพิ่มเอกสารใน README.md ที่อธิบายวิธีการสร้างโปรเจกต์ Supabase, ตั้งค่า connection string, ตัวแปร environment, และสคริปต์ vercel-build เพื่อให้ migration ระหว่าง deploy บน Vercel ทำงานอัตโนมัติ
-- อัปเดตไฟล์ backend/package.json เพิ่มสคริปต์ "vercel-build": "prisma generate && prisma migrate deploy && tsc"
-- อัปเดตไฟล์ backend/vercel.json ให้ใช้ buildCommand ดังกล่าว
+- อัปเดตไฟล backend/package.json เพิ่มสคริปต์ "vercel-build": "prisma generate && prisma migrate deploy && tsc"
+- อัปเดตไฟล backend/vercel.json ให้ใช้ buildCommand ดังกล่าว
 - เพิ่มส่วน Supabase ใน README.md ภายใต้หัวข้อ "Deploy บน Vercel + PostgreSQL (รองรับ Supabase)"
 - ทดสอบการเชื่อมต่อในเครื่องด้วยการกำหนด DATABASE_URL จาก Supabase รัน prisma migrate deploy และ seed เพื่อสร้างผู้ดูแลระบบ
 - ยืนยันว่า health endpoint ของ backend ทำงานได้ปกติเมื่อเชื่อมต่อกับ Supabase
