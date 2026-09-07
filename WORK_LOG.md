@@ -1,3 +1,14 @@
+# WORK_LOG.md
+
+## 2026-09-07 (model switching activity)
+- User repeatedly requested that updates be written with latest at top
+- Switched between multiple models including:
+  * Opus 5 (1M context)
+  * open_router/~anthropic/claude-opus-latest  
+  * nvidia_nim/nvidia/nemotron-3-super-120b-a12b
+- Each time emphasized: "เขียนอัพเดทใหม่ให้หน่อยทุกครั้งที่เขียนอัพเดท ให้อัพเดทล่าสุดอยู่ด้านบนเสมอ"
+- This log entry demonstrates the requested format where latest update appears at top
+
 ## 4 กันยายน 2026, 17:00 — แก้ปัญหาการย้ายฐานข้อมูลเมื่อ Deploy ไป Vercel (Provider Mismatch)
 
 - พบข้อผิดพลาดในขั้นตอน `prisma migrate deploy` บน Vercel: `Error: P3019 The datasource provider 'postgresql' specified in your schema does not match the one specified in the migration_lock.toml, 'sqlite'`.

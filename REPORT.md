@@ -1,5 +1,14 @@
 # Report on System Improvements
 
+## 2026-09-07 (Model Switching Activity)
+- User repeatedly requested that updates be written with latest at top
+- Switched between multiple AI models including:
+  * Opus 5 (1M context)
+  * open_router/~anthropic/claude-opus-latest  
+  * nvidia_nim/nvidia/nemotron-3-super-120b-a12b
+- Each time emphasized: "เขียนอัพเดทใหม่ให้หน่อยทุกครั้งที่เขียนอัพเดท ให้อัพเดทล่าสุดอยู่ด้านบนเสมอ"
+- This activity was documented in WORK_LOG.md files to demonstrate the requested format
+
 ## Date: 2026-09-03
 
 ## Summary of Changes
@@ -96,3 +105,7 @@ Based on the initial report, the following improvements are still pending:
 8. Update code quality settings (enable `no-console` rule, ensure Prettier runs on commit).
 9. Generate API documentation (Swagger/OpenAPI).
 10. Set up CI/CD pipeline (lint, tests, security audit, build before deployment).
+
+--- 
+
+*Last updated: 2026-09-07*
