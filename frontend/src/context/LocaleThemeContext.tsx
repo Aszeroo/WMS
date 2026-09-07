@@ -1,6 +1,5 @@
 import { createContext, useContext, useState, useMemo, ReactNode, useEffect } from 'react';
-import { ConfigProvider } from 'antd';
-import theme from 'antd/lib/theme';
+import { ConfigProvider, theme } from 'antd';
 import th_TH from 'antd/locale/th_TH';
 import en_US from 'antd/locale/en_US';
 import i18n from '../i18n';
@@ -38,13 +37,21 @@ export function LocaleThemeProvider({ children }: { children: ReactNode }) {
 
   // Sync i18n language when language changes
   useEffect(() => {
+    console.log('[LocaleThemeContext] Changing language to:', language);
     i18n.changeLanguage(language);
     window.localStorage.setItem('wms2-language', language);
   }, [language]);
 
-  // Persist darkMode preference
+  // Persist darkMode preference and update root class
   useEffect(() => {
     window.localStorage.setItem('wms2-darkMode', String(darkMode));
+    if (typeof window !== 'undefined') {
+      if (darkMode) {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    }
   }, [darkMode]);
 
   const antdLocale = language === 'th' ? th_TH : en_US;

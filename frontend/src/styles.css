@@ -81,3 +81,99 @@ button, input, textarea, select { font: inherit; }
   .filter-bar > .ant-btn { width: 100%; }
   .form-grid { grid-template-columns: 1fr; gap: 0; }
 }
+
+/* Dark mode overrides */
+.dark {
+  color: #e6eef6;
+  background: #0f2c46;
+}
+.dark body {
+  background: #0f2c46;
+  color: #e6eef6;
+}
+.dark .app-sider {
+  box-shadow: 6px 0 24px rgba(15, 44, 70, 0.4);
+}
+.dark .brand-mark {
+  color: #fff;
+}
+.dark .brand-symbol {
+  color: #08243b;
+  background: #8ee2c1;
+}
+.dark .app-header {
+  background: #163b5a;
+  border-bottom: 1px solid #274a66;
+}
+.dark .eyebrow {
+  color: #9bbecf;
+}
+.dark .header-title {
+  color: #e6eef6 !important;
+}
+.dark .ant-table-wrapper .ant-table-thead > tr > th {
+  color: #e6eef6;
+  background: #163b5a;
+}
+.dark .ant-table-wrapper .ant-table-tbody > tr > td {
+  color: #e6eef6;
+}
+.dark .content-card,
+.dark .stat-card,
+.dark .login-card {
+  border-color: #274a66;
+  background: #163b5a;
+  box-shadow: 0 8px 26px rgba(18, 32, 46, 0.2);
+}
+.dark .ant-card-head {
+  border-bottom-color: #274a66;
+}
+.dark .ant-menu-item-selected {
+  color: #e6eef6;
+  background: #274a66;
+}
+.dark .ant-menu-item {
+  color: #e6eef6;
+}
+.dark .ant-menu-item:hover {
+  background: rgba(255,255,255,0.1);
+}
+.dark .ant-input,
+.dark .ant-select-selector {
+  background: #1e3a5a;
+  border-color: #274a66;
+  color: #e6eef6;
+}
+.dark .ant-input:focus,
+.dark .ant-select-selector:focus {
+  border-color: #8ee2c1;
+  box-shadow: 0 0 0 2px rgba(142, 226, 193, 0.2);
+}
+.dark .ant-btn-primary {
+  background: #8ee2c1;
+  border-color: #8ee2c1;
+  color: #08243b;
+}
+.dark .ant-btn-primary:hover {
+  background: #7ac9b2;
+  border-color: #7ac9b2;
+}
+.dark .ant-btn-default {
+  background: transparent;
+  border-color: #274a66;
+  color: #e6eef6;
+}
+.dark .ant-btn-default:hover {
+  background: rgba(255,255,255,0.1);
+  border-color: #274a66;
+}
+.dark .ant-tag {
+  background: rgba(255,255,255,0.1);
+  color: #e6eef6;
+}
+.dark .ant-statistic-title {
+  color: #a0b8c9;
+}
+.dark .ant-statistic-content {
+  color: #e6eef6;
+}

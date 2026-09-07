@@ -48,9 +48,9 @@ export function AppLayout() {
 
   return (
     <Layout className="app-shell">
-      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} breakpoint="lg" theme="dark" className="app-sider">
+      <Sider collapsible collapsed={collapsed} onCollapse={setCollapsed} breakpoint="lg" theme={darkMode ? 'dark' : 'light'} className="app-sider">
         <div className="brand-mark"><span className="brand-symbol">ED</span>{!collapsed && <span>Equipment Desk</span>}</div>
-        <Menu theme="dark" mode="inline" selectedKeys={[selectedKey]} items={menuItems} onClick={({ key }) => navigate(key)} />
+        <Menu theme={darkMode ? 'dark' : 'light'} mode="inline" selectedKeys={[selectedKey]} items={menuItems} onClick={({ key }) => navigate(key)} />
       </Sider>
       <Layout>
         <Header className="app-header">
