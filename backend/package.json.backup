@@ -3,9 +3,9 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "PRISMA_SCHEMA=./prisma/schema.prisma tsx watch src/server.ts",
+    "dev": "tsx watch src/server.ts",
     "build": "prisma generate && tsc",
-    "vercel-build": "prisma generate && prisma migrate deploy && tsc",
+    "vercel-build": "prisma generate && prisma migrate reset --force && tsc",
     "start": "node dist/server.js",
     "generate": "prisma generate",
     "migrate": "prisma migrate dev",
