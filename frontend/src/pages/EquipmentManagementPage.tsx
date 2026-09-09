@@ -229,7 +229,7 @@ export function EquipmentManagementPage() {
         <div><Typography.Text className="eyebrow">INVENTORY</Typography.Text><Typography.Title level={2}>จัดการอุปกรณ์</Typography.Title><Typography.Paragraph>จัดระเบียบประเภทอุปกรณ์และรายการครุภัณฑ์ที่ใช้งานอยู่</Typography.Paragraph></div>
         {canWrite && <Button type="primary" onClick={() => openInstanceModal()}>+ เพิ่มอุปกรณ์</Button>}
       </section>
-      <Card bordered={false} className="content-card">
+      <Card className="content-card">
         <Spin spinning={loading}>
           <Tabs
             items={[

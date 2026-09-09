@@ -148,7 +148,7 @@ export function IssuanceHistoryPage() {
     <div className="page-stack">
       <section className="page-intro"><div><Typography.Text className="eyebrow">LENDING LOG</Typography.Text><Typography.Title level={2}>ประวัติการเบิก</Typography.Title><Typography.Paragraph>ติดตามว่าอุปกรณ์อยู่กับใครและถูกนำไปใช้งานที่ใด</Typography.Paragraph></div>{canWrite && <Button type="primary" onClick={() => { form.resetFields(); form.setFieldValue('issueDate', new Date().toISOString().slice(0, 10)); setModalOpen(true); }}>+ บันทึกการเบิก</Button>}</section>
       {error && <Alert type="error" showIcon message={error} />}
-      <Card bordered={false} className="content-card">
+      <Card className="content-card">
         <form className="filter-bar" onSubmit={applyFilters}>
           <label>ตั้งแต่<input type="date" value={filters.startDate} onChange={(event) => setFilters({ ...filters, startDate: event.target.value })} /></label>
           <label>ถึง<input type="date" value={filters.endDate} onChange={(event) => setFilters({ ...filters, endDate: event.target.value })} /></label>

@@ -63,14 +63,14 @@ export function DashboardPage() {
           { label: t('dashboard.under_repair'), key: 'underRepair' as const, className: 'stat-warning' },
         ].map((item) => (
           <Col xs={24} sm={12} xl={6} key={item.key}>
-            <Card className={`stat-card ${item.className}`} bordered={false}>
+            <Card className={`stat-card ${item.className}`}>
               {stats ? <Statistic title={item.label} value={stats[item.key]} /> : <Skeleton active paragraph={false} />}
             </Card>
           </Col>
         ))}
       </Row>
 
-      <Card bordered={false} className="content-card" title={t('dashboard.latest_equipment')}>
+      <Card className="content-card" title={t('dashboard.latest_equipment')}>
         {recent.length === 0 ? (
           <Empty description={t('dashboard.no_equipment')} />
         ) : (

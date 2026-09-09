@@ -35,7 +35,7 @@ export function LoginPage() {
 
   return (
     <main className="login-page">
-      <Card className="login-card" bordered={false}>
+      <Card className="login-card">
         <div className="login-brand"><span className="brand-symbol">ED</span><span>Equipment Desk</span></div>
         <Typography.Text className="eyebrow">SECURE OPERATIONS CONSOLE</Typography.Text>
         <Typography.Title level={2}>เข้าสู่ระบบ</Typography.Title>

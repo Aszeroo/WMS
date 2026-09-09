@@ -294,7 +294,7 @@ export function RepairHistoryPage() {
       <section className="page-intro"><div><Typography.Text className="eyebrow">MAINTENANCE LOG</Typography.Text><Typography.Title level={2}>ประวัติการซ่อม</Typography.Title><Typography.Paragraph>บันทึกอาการ การดำเนินการ และสถานะการซ่อมของอุปกรณ์</Typography.Paragraph></div>{canWrite && <Button type="primary" onClick={() => openModal()}>+ แจ้งซ่อม</Button>}</section>
       {historyError && <Alert type="error" showIcon message={historyError} action={<Button size="small" onClick={() => void loadHistory()}>ลองใหม่</Button>} />}
       {lookupError && <Alert type="warning" showIcon message={lookupError} action={<Button size="small" onClick={retryLookups}>ลองใหม่</Button>} />}
-      <Card bordered={false} className="content-card">
+      <Card className="content-card">
         <form className="filter-bar" onSubmit={applyFilters}>
           <label>ตั้งแต่<input type="date" value={draftFilters.startDate} onChange={(event) => setDraftFilters((current) => ({ ...current, startDate: event.target.value }))} /></label>
           <label>ถึง<input type="date" value={draftFilters.endDate} onChange={(event) => setDraftFilters((current) => ({ ...current, endDate: event.target.value }))} /></label>

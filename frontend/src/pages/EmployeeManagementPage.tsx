@@ -94,7 +94,7 @@ export function EmployeeManagementPage() {
         {canWrite && <Button type="primary" onClick={() => openModal()}>+ เพิ่มพนักงาน</Button>}
       </section>
       {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void loadEmployees()}>ลองใหม่</Button>} />}
-      <Card bordered={false} className="content-card">
+      <Card className="content-card">
         <Spin spinning={loading}>
           <Table rowKey="id" columns={columns} dataSource={employees} locale={{ emptyText: <Empty description="ยังไม่มีข้อมูลพนักงาน" /> }} scroll={{ x: 650 }} pagination={{ pageSize: 10, showSizeChanger: true }} />
         </Spin>

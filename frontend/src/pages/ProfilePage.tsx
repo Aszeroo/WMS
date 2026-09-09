@@ -63,7 +63,7 @@ export function ProfilePage() {
         </div>
       </section>
       {error && <Alert type="error" showIcon message={error} />}
-      <Card bordered={false} className="content-card" title="ข้อมูลบัญชี">
+      <Card className="content-card" title="ข้อมูลบัญชี">
         <Space direction="vertical" size="middle" style={{ width: '100%' }}>
           <Typography.Text>สิทธิ์การใช้งาน: <Tag>{roleLabel[user.role]}</Tag></Typography.Text>
           <Form
@@ -83,7 +83,7 @@ export function ProfilePage() {
           </Form>
         </Space>
       </Card>
-      <Card bordered={false} className="content-card" title="เปลี่ยนรหัสผ่าน">
+      <Card className="content-card" title="เปลี่ยนรหัสผ่าน">
         <Form form={passwordForm} layout="vertical" onFinish={submitPassword} requiredMark="optional">
           <Form.Item name="currentPassword" label="รหัสผ่านปัจจุบัน" rules={[{ required: true, message: 'กรุณาระบุรหัสผ่านปัจจุบัน' }]}>
             <Input.Password autoComplete="current-password" />

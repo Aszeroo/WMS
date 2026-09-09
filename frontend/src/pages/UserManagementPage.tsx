@@ -138,7 +138,7 @@ export function UserManagementPage() {
         <Button type="primary" onClick={() => openModal()}>+ เพิ่มผู้ใช้งาน</Button>
       </section>
       {error && <Alert type="error" showIcon message={error} action={<Button size="small" onClick={() => void loadUsers()}>ลองใหม่</Button>} />}
-      <Card bordered={false} className="content-card">
+      <Card className="content-card">
         <Spin spinning={loading}>
           <Table rowKey="id" columns={columns} dataSource={users} locale={{ emptyText: <Empty description="ยังไม่มีผู้ใช้งาน" /> }} scroll={{ x: 700 }} pagination={{ pageSize: 10, showSizeChanger: true }} />
         </Spin>
