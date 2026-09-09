@@ -16,6 +16,7 @@ import {
 import type { TableProps } from 'antd';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useAuth } from '../auth/AuthContext';
+import { useTranslation } from 'react-i18next';
 import { apiService } from '../services/api';
 import { getErrorMessage } from '../services/errors';
 import type {
@@ -28,13 +29,6 @@ import type {
   RepairUpdateInput,
 } from '../types';
 
-const repairStatusOptions = [
-  { value: 'reported', label: 'แจ้งซ่อม', color: 'orange' },
-  { value: 'in_progress', label: 'กำลังซ่อม', color: 'blue' },
-  { value: 'completed', label: 'ซ่อมเสร็จแล้ว', color: 'green' },
-  { value: 'rejected', label: 'ยกเลิก', color: 'default' },
-];
-const statusByValue = Object.fromEntries(repairStatusOptions.map((item) => [item.value, item]));
 const EQUIPMENT_PAGE_SIZE = 20;
 
 type RepairFormValues = {
@@ -62,10 +56,6 @@ type EquipmentSearchSelectProps = {
 
 const emptyFilters = (): RepairFilters => ({ startDate: '', endDate: '', status: '' });
 
-function formatDate(value?: string | null) {
-  return value ? new Intl.DateTimeFormat('th-TH', { dateStyle: 'medium' }).format(new Date(value)) : '—';
-}
-
 function equipmentLabel(item: EquipmentInstance) {
   return `${item.serialNumber} — ${item.type?.name ?? ''}`;
 }
@@ -76,6 +66,7 @@ function EquipmentSearchSelect({ value, onChange, status, onLookupError }: Equip
   const latestRequest = useRef(0);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const selectedOption = useRef<EquipmentInstance | undefined>(undefined);
+  const { t } = useTranslation();
 
   const loadOptions = useCallback(async (search: string) => {
     const requestId = latestRequest.current + 1;
@@ -126,7 +117,7 @@ function EquipmentSearchSelect({ value, onChange, status, onLookupError }: Equip
       filterOption={false}
       loading={loading}
       optionFilterProp="label"
-      placeholder="ค้นหาหมายเลขซีเรียล ยี่ห้อ หรือรุ่น"
+      placeholder={t('equipmentSearch.placeholder')}
       value={value}
       onChange={(nextValue) => {
         selectedOption.current = options.find((item) => item.id === nextValue);
@@ -140,6 +131,15 @@ function EquipmentSearchSelect({ value, onChange, status, onLookupError }: Equip
 
 export function RepairHistoryPage() {
   const { canWrite, isAdmin } = useAuth();
+  const { t, i18n } = useTranslation();
+
+  // Format date according to current language
+  const formatDate = (value?: string | null) => {
+    if (!value) return '—';
+    const locale = i18n.language === 'th' ? 'th-TH' : 'en-US';
+    return new Intl.DateTimeFormat(locale, { dateStyle: 'medium' }).format(new Date(value));
+  };
+
   const [result, setResult] = useState<PageResult<Repair>>({ data: [], total: 0, page: 1, pageSize: 10, totalPages: 0 });
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [draftFilters, setDraftFilters] = useState<RepairFilters>(emptyFilters);
@@ -151,6 +151,15 @@ export function RepairHistoryPage() {
   const [lookupError, setLookupError] = useState('');
   const [equipmentLookupVersion, setEquipmentLookupVersion] = useState(0);
   const [form] = Form.useForm<RepairFormValues>();
+
+  // Compute repair status options using translation
+  const repairStatusOptions = [
+    { value: 'reported', label: t('repairHistory.status.reported'), color: 'orange' },
+    { value: 'in_progress', label: t('repairHistory.status.in_progress'), color: 'blue' },
+    { value: 'completed', label: t('repairHistory.status.completed'), color: 'green' },
+    { value: 'rejected', label: t('repairHistory.status.rejected'), color: 'default' },
+  ];
+  const statusByValue = Object.fromEntries(repairStatusOptions.map((item) => [item.value, item]));
 
   const loadEmployees = useCallback(async () => {
     setLookupError('');
@@ -221,7 +230,7 @@ export function RepairHistoryPage() {
           notes: values.notes,
         };
         await apiService.updateRepair(editing.id, updatePayload);
-        message.success('แก้ไขประวัติการซ่อมแล้ว');
+        message.success(t('repairHistory.messages.updateSuccess'));
       } else {
         const createPayload: RepairCreateInput = {
           equipmentId: values.equipmentId,
@@ -233,7 +242,7 @@ export function RepairHistoryPage() {
           notes: values.notes,
         };
         await apiService.createRepair(createPayload);
-        message.success('บันทึกประวัติการซ่อมแล้ว');
+        message.success(t('repairHistory.messages.createSuccess'));
       }
       setModalOpen(false);
       form.resetFields();
@@ -245,15 +254,15 @@ export function RepairHistoryPage() {
 
   const deleteRepair = (repair: Repair) => {
     Modal.confirm({
-      title: 'ลบประวัติการซ่อมนี้หรือไม่',
-      content: 'ข้อมูลจะถูกลบถาวร',
-      okText: 'ลบ',
-      cancelText: 'ยกเลิก',
+      title: t('repairHistory.deleteConfirm.title'),
+      content: t('repairHistory.deleteConfirm.content'),
+      okText: t('repairHistory.deleteConfirm.okText'),
+      cancelText: t('repairHistory.deleteConfirm.cancelText'),
       okButtonProps: { danger: true },
       onOk: async () => {
         try {
           await apiService.deleteRepair(repair.id);
-          message.success('ลบประวัติแล้ว');
+          message.success(t('repairHistory.messages.deleteSuccess'));
           await loadHistory();
         } catch (reason) {
           message.error(getErrorMessage(reason));
@@ -281,40 +290,84 @@ export function RepairHistoryPage() {
   };
 
   const columns: TableProps<Repair>['columns'] = [
-    { title: 'วันที่แจ้ง', dataIndex: 'repairDate', key: 'repairDate', render: formatDate },
-    { title: 'อุปกรณ์', key: 'equipment', render: (_, item) => <><Typography.Text strong>{item.equipment.serialNumber}</Typography.Text><br /><Typography.Text type="secondary">{item.equipment.type?.name ?? '—'}</Typography.Text></> },
-    { title: 'อาการ / รายละเอียด', key: 'symptoms', width: 240, render: (_, item) => <><Typography.Text>{item.symptoms}</Typography.Text>{item.notes && <><br /><Typography.Text type="secondary">{item.notes}</Typography.Text></>}</> },
-    { title: 'ผู้รับผิดชอบ', key: 'assignee', render: (_, item) => item.employee?.name ?? item.repairedBy ?? '—' },
-    { title: 'สถานะ', dataIndex: 'status', key: 'status', render: (value: string) => { const status = statusByValue[value]; return <Tag color={status?.color}>{status?.label ?? value}</Tag>; } },
-    ...(canWrite ? [{ title: 'จัดการ', key: 'actions', render: (_value: unknown, item: Repair) => <Space><Button type="link" onClick={() => openModal(item)}>แก้ไข</Button>{isAdmin && <Button type="link" danger onClick={() => deleteRepair(item)}>ลบ</Button>}</Space> }] : []),
+    { title: t('repairHistory.table.date'), dataIndex: 'repairDate', key: 'repairDate', render: formatDate },
+    { title: t('repairHistory.table.equipment'), key: 'equipment', render: (_, item) => <><Typography.Text strong>{item.equipment.serialNumber}</Typography.Text><br /><Typography.Text type="secondary">{item.equipment.type?.name ?? '—'}</Typography.Text></> },
+    { title: t('repairHistory.table.symptoms'), key: 'symptoms', width: 240, render: (_, item) => <><Typography.Text>{item.symptoms}</Typography.Text>{item.notes && <><br /><Typography.Text type="secondary">{item.notes}</Typography.Text></>}</> },
+    { title: t('repairHistory.table.assignee'), key: 'assignee', render: (_, item) => item.employee?.name ?? item.repairedBy ?? '—' },
+    { title: t('repairHistory.table.status'), dataIndex: 'status', key: 'status', render: (value: string) => { const status = statusByValue[value]; return <Tag color={status?.color}>{status?.label ?? value}</Tag>; } },
+    ...(canWrite ? [{ title: t('repairHistory.table.actions'), key: 'actions', render: (_value: unknown, item: Repair) => <Space><Button type="link" onClick={() => openModal(item)}>{t('employeeManagement.modal.actions.edit')}</Button>{isAdmin && <Button type="link" danger onClick={() => deleteRepair(item)}>{t('employeeManagement.modal.actions.delete')}</Button>}</Space> }] : []),
   ];
 
   return (
     <div className="page-stack">
-      <section className="page-intro"><div><Typography.Text className="eyebrow">MAINTENANCE LOG</Typography.Text><Typography.Title level={2}>ประวัติการซ่อม</Typography.Title><Typography.Paragraph>บันทึกอาการ การดำเนินการ และสถานะการซ่อมของอุปกรณ์</Typography.Paragraph></div>{canWrite && <Button type="primary" onClick={() => openModal()}>+ แจ้งซ่อม</Button>}</section>
+      <section className="page-intro"><div><Typography.Text className="eyebrow">{t('repairHistory.eyebrow')}</Typography.Text><Typography.Title level={2}>{t('repairHistory.title')}</Typography.Title><Typography.Paragraph>{t('repairHistory.description')}</Typography.Paragraph></div>{canWrite && <Button type="primary" onClick={() => openModal()}>{t('repairHistory.addButton')}</Button>}</section>
       {historyError && <Alert type="error" showIcon message={historyError} action={<Button size="small" onClick={() => void loadHistory()}>ลองใหม่</Button>} />}
       {lookupError && <Alert type="warning" showIcon message={lookupError} action={<Button size="small" onClick={retryLookups}>ลองใหม่</Button>} />}
       <Card className="content-card">
         <form className="filter-bar" onSubmit={applyFilters}>
-          <label>ตั้งแต่<input type="date" value={draftFilters.startDate} onChange={(event) => setDraftFilters((current) => ({ ...current, startDate: event.target.value }))} /></label>
-          <label>ถึง<input type="date" value={draftFilters.endDate} onChange={(event) => setDraftFilters((current) => ({ ...current, endDate: event.target.value }))} /></label>
-          <label>สถานะ<select value={draftFilters.status} onChange={(event) => setDraftFilters((current) => ({ ...current, status: event.target.value }))}><option value="">ทั้งหมด</option>{repairStatusOptions.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select></label>
-          <label>อุปกรณ์<EquipmentSearchSelect key={`filter-${equipmentLookupVersion}`} value={draftFilters.equipmentId} onChange={(equipmentId) => setDraftFilters((current) => ({ ...current, equipmentId }))} onLookupError={setLookupError} /></label>
-          <label>ผู้รับผิดชอบ<Select allowClear showSearch optionFilterProp="label" placeholder="ทั้งหมด" value={draftFilters.employeeId} onChange={(employeeId) => setDraftFilters((current) => ({ ...current, employeeId: employeeId ?? undefined }))} options={employees.map((item) => ({ value: item.id, label: `${item.name} (${item.employeeId})` }))} /></label>
-          <Space><Button htmlType="submit">ค้นหา</Button><Button onClick={clearFilters}>ล้างตัวกรอง</Button></Space>
+          <label>{t('repairHistory.filter.startDate')}<input type="date" value={draftFilters.startDate} onChange={(event) => setDraftFilters((current) => ({ ...current, startDate: event.target.value }))} /></label>
+          <label>{t('repairHistory.filter.endDate')}<input type="date" value={draftFilters.endDate} onChange={(event) => setDraftFilters((current) => ({ ...current, endDate: event.target.value }))} /></label>
+          <label>{t('repairHistory.filter.status')}<select value={draftFilters.status} onChange={(event) => setDraftFilters((current) => ({ ...current, status: event.target.value }))}><option value="">{t('repairHistory.filter.all')}</option>{repairStatusOptions.map((status) => <option key={status.value} value={status.value}>{status.label}</option>)}</select></label>
+          <label>{t('repairHistory.filter.equipment')}<EquipmentSearchSelect key={`filter-${equipmentLookupVersion}`} value={draftFilters.equipmentId} onChange={(equipmentId) => setDraftFilters((current) => ({ ...current, equipmentId }))} onLookupError={setLookupError} /></label>
+          <label>{t('repairHistory.filter.assignee')}<Select allowClear showSearch optionFilterProp="label" placeholder={t('repairHistory.filter.assignee')} value={draftFilters.employeeId} onChange={(employeeId) => setDraftFilters((current) => ({ ...current, employeeId: employeeId ?? undefined }))} options={employees.map((item) => ({ value: item.id, label: `${item.name} (${item.employeeId})` }))} /></label>
+          <Space><Button htmlType="submit">{t('buttons.search')}</Button><Button onClick={clearFilters}>{t('buttons.reset')}</Button></Space>
         </form>
-        <Table rowKey="id" loading={loading} columns={columns} dataSource={result.data} locale={{ emptyText: <Empty description="ยังไม่มีประวัติการซ่อม" /> }} scroll={{ x: 1050 }} pagination={{ current: result.page, pageSize: result.pageSize, total: result.total, showSizeChanger: true, onChange: (page, pageSize) => setResult((current) => ({ ...current, page, pageSize })) }} />
+        <Table rowKey="id" loading={loading} columns={columns} dataSource={result.data} locale={{ emptyText: <Empty description={t('repairHistory.empty.description')} /> }} scroll={{ x: 1050 }} pagination={{ current: result.page, pageSize: result.pageSize, total: result.total, showSizeChanger: true, onChange: (page, pageSize) => setResult((current) => ({ ...current, page, pageSize })) }} />
       </Card>
 
-      <Modal title={editing ? 'แก้ไขประวัติการซ่อม' : 'แจ้งซ่อมอุปกรณ์'} open={modalOpen} onCancel={() => setModalOpen(false)} footer={null} destroyOnHidden>
+      <Modal title={editing ? t('repairHistory.modal.title.edit') : t('repairHistory.modal.title.add')} open={modalOpen} onCancel={() => setModalOpen(false)} footer={null} destroyOnHidden>
         <Form form={form} layout="vertical" onFinish={submitRepair} requiredMark="optional">
-          {editing ? <Form.Item label="อุปกรณ์"><Input value={equipmentLabel(editing.equipment)} disabled /><Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>ไม่สามารถเปลี่ยนอุปกรณ์ของประวัติการซ่อมได้ หากเลือกอุปกรณ์ผิด ให้ลบและสร้างรายการใหม่ตามสิทธิ์</Typography.Paragraph></Form.Item> : <Form.Item name="equipmentId" label="อุปกรณ์" rules={[{ required: true, message: 'กรุณาเลือกอุปกรณ์' }]}><EquipmentSearchSelect key={`create-${equipmentLookupVersion}`} onChange={(equipmentId) => form.setFieldValue('equipmentId', equipmentId)} status="available" onLookupError={setLookupError} /></Form.Item>}
-          <Form.Item name="employeeId" label="ผู้รับผิดชอบ"><Select allowClear showSearch optionFilterProp="label" placeholder="เลือกพนักงาน (ถ้ามี)" options={employees.map((item) => ({ value: item.id, label: `${item.name} (${item.employeeId})` }))} /></Form.Item>
-          <div className="form-grid"><Form.Item name="repairDate" label="วันที่แจ้ง"><Input type="date" /></Form.Item><Form.Item name="status" label="สถานะ"><Select options={repairStatusOptions.map(({ value, label }) => ({ value, label }))} /></Form.Item></div>
-          <Form.Item name="symptoms" label="อาการ / ปัญหา" rules={[{ required: true, message: 'กรุณาระบุอาการหรือปัญหา' }]}><Input.TextArea rows={3} placeholder="อธิบายอาการที่พบ" /></Form.Item>
-          <Form.Item name="repairedBy" label="ช่าง / ผู้ซ่อม"><Input placeholder="ระบุชื่อช่าง (ถ้ามี)" /></Form.Item>
-          <Form.Item name="notes" label="หมายเหตุ"><Input.TextArea rows={2} /></Form.Item>
-          <div className="modal-actions"><Button onClick={() => setModalOpen(false)}>ยกเลิก</Button><Button type="primary" htmlType="submit">บันทึก</Button></div>
+          {editing ? (
+            <Form.Item label={t('repairHistory.form.label.equipment')}>
+              <Input value={equipmentLabel(editing.equipment)} disabled />
+              <Typography.Paragraph type="secondary" style={{ marginTop: 8, marginBottom: 0 }}>
+                ไม่สามารถเปลี่ยนอุปกรณ์ของประวัติการซ่อมได้ หากเลือกอุปกรณ์ผิด ให้ลบและสร้างรายการใหม่ตามสิทธิ์
+              </Typography.Paragraph>
+            </Form.Item>
+          ) : (
+            <Form.Item
+              name="equipmentId"
+              label={t('repairHistory.form.label.equipment')}
+              rules={[{ required: true, message: t('repairHistory.form.label.equipment') }]}
+            >
+              <EquipmentSearchSelect
+                key={`create-${equipmentLookupVersion}`}
+                onChange={(equipmentId) => form.setFieldValue('equipmentId', equipmentId)}
+                status="available"
+                onLookupError={setLookupError}
+              />
+            </Form.Item>
+          )}
+          <Form.Item name="employeeId" label={t('repairHistory.form.label.assignee')}>
+            <Select
+              allowClear
+              showSearch
+              optionFilterProp="label"
+              placeholder={t('repairHistory.form.label.assignee')}
+              options={employees.map((item) => ({ value: item.id, label: `${item.name} (${item.employeeId})` }))}
+            />
+          </Form.Item>
+          <div className="form-grid">
+            <Form.Item name="repairDate" label={t('repairHistory.form.label.repairDate')}>
+              <Input type="date" />
+            </Form.Item>
+            <Form.Item name="status" label={t('repairHistory.form.label.status')}>
+              <Select options={repairStatusOptions.map(({ value, label }) => ({ value, label }))} />
+            </Form.Item>
+          </div>
+          <Form.Item name="symptoms" label={t('repairHistory.form.label.symptoms')} rules={[{ required: true, message: t('repairHistory.form.label.symptoms') }]}>
+            <Input.TextArea rows={3} placeholder={t('repairHistory.form.placeholder.symptoms')} />
+          </Form.Item>
+          <Form.Item name="repairedBy" label={t('repairHistory.form.label.repairedBy')}>
+            <Input placeholder={t('repairHistory.form.label.repairedBy')} />
+          </Form.Item>
+          <Form.Item name="notes" label={t('repairHistory.form.label.notes')}>
+            <Input.TextArea rows={2} />
+          </Form.Item>
+          <div className="modal-actions">
+            <Button onClick={() => setModalOpen(false)}>{t('cancel')}</Button>
+            <Button type="primary" htmlType="submit">{t('save')}</Button>
+          </div>
         </Form>
       </Modal>
     </div>

@@ -4,6 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuth } from '../auth/AuthContext';
 import { apiService } from '../services/api';
 import { RepairHistoryPage } from './RepairHistoryPage';
+import i18n from '../i18n';
 
 vi.mock('../auth/AuthContext', () => ({ useAuth: vi.fn() }));
 vi.mock('../services/api', () => ({
@@ -37,6 +38,7 @@ const repair = {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.spyOn(message, 'success').mockImplementation(() => ({ then: vi.fn() } as never));
+  i18n.changeLanguage('th');
   mockedUseAuth.mockReturnValue({
     user: { id: 1, username: 'staff', email: 'staff@test.local', role: 'staff' },
     loading: false,
